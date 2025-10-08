@@ -17,7 +17,6 @@ function createWindow() {
     },
   });
 
-  // Start maximized
   mainWindow.maximize();
 
   if (process.env.NODE_ENV === 'development') {
@@ -36,7 +35,6 @@ function createWindow() {
 app.whenReady().then(() => {
     const mainWindow = createWindow();
   
-    // Register shortcut Ctrl+Shift+I to toggle DevTools
     globalShortcut.register('CommandOrControl+Shift+I', () => {
         mainWindow.webContents.openDevTools();
     });
