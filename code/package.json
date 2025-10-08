@@ -4,7 +4,7 @@
   "private": true,
   "main": "electron/main.js",
   "build": {
-    "appId": "com.mycompany.myelectronapp",
+    "appId": "com.digital-innovation.work-area-projection",
     "files": [
       "out/",
       "electron/"
