@@ -5,6 +5,7 @@
   --foreground: #171717;
   --color-primary:#008C99;
   --color-secondary: #1AC1D0;
+  --color-popup:#B5E6EA;
   --color-text: #171717;
   --color-white: #F6F6F6;
   --hover-primary:#00626b;
@@ -21,8 +22,15 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --background: #ffffff;
+  --foreground: #171717;
+  --color-primary:#008C99;
+  --color-secondary: #1AC1D0;
+  --color-text: #171717;
+  --color-white: #F6F6F6;
+  --hover-primary:#00626b;
+  --hover-secondary: #10909c;
+  --color-yellow: #FCFFE6;
   }
 }
 
