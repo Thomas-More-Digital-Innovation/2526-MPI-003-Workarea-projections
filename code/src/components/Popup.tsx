@@ -24,7 +24,7 @@ const Popup = ({ title, popupType }: { title: string; popupType: string }) => {
   const images = Array(3).fill("praline.jpeg");
 
   return (
-    <div className="p-4 bg-[var(--color-popup)] rounded shadow relative w-[80%] md:w-[40%]">
+    <div className="p-4 bg-[var(--color-popup)] rounded-lg shadow relative w-[80%] md:w-[40%]">
       <input
         type="file"
         ref={fileInputRef}
@@ -65,7 +65,17 @@ const Popup = ({ title, popupType }: { title: string; popupType: string }) => {
             </div>
 
             {/* Buttons aligned left & right */}
-           <div className="w-full flex justify-between items-center mt-4">
+          </>
+        )}
+        {popupType === "gridPreset" && (
+            {/*Hier komt code wat getoont moet worden*/}
+        )}
+        {popupType == "exportImport" && (
+            <div>
+                <p>test</p>
+            </div>
+        )}
+         <div className="w-full flex justify-between items-center mt-4">
             <div className="w-32">
                 <SecondaryButton text="Annuleren" />
             </div>
@@ -73,11 +83,6 @@ const Popup = ({ title, popupType }: { title: string; popupType: string }) => {
                 <PrimaryButton text="Opslaan" />
             </div>
             </div>
-          </>
-        )}
-        {popupType === "gridPreset" && (
-            {/*Hier komt code wat getoont moet worden*/}
-        )}
       </div>
     </div>
   );
