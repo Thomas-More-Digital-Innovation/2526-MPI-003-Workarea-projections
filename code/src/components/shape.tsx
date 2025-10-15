@@ -8,7 +8,7 @@ interface ShapeProps {
 }
 
 const Shape: React.FC<ShapeProps> = ({ shape, size, completed = false }) => {
-  // 📏 Shape afmetingen in vw (responsief)
+
   const sizeStyles =
     shape === "circle"
       ? {
@@ -22,18 +22,15 @@ const Shape: React.FC<ShapeProps> = ({ shape, size, completed = false }) => {
           large: { width: "24vw", height: "12vw" },
         }[size];
 
-  // ✅ Borderkleur afhankelijk van completed
   const borderColor = completed ? "border-green-500" : "border-foreground";
 
-  // 📌 Badge grootte dynamisch (in vw)
   const badgeSize =
     size === "small"
       ? { width: "2.5vw", height: "2.5vw", icon: "1.2vw" }
       : size === "medium"
       ? { width: "3vw", height: "3vw", icon: "1.5vw" }
       : { width: "4vw", height: "4vw", icon: "2vw" };
-
-  // 📌 Badge offsets dynamisch (afhankelijk van shape en size)
+      
   const badgeOffset =
     shape === "circle"
       ? {
