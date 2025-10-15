@@ -1,6 +1,13 @@
 import React from "react";
 
-const Button = ({ text, type = "primary" }: { text: string; type?: "primary" | "secondary" }) => {
+
+type ButtonProps = {
+  text: string;
+  type?: "primary" | "secondary";
+  onClick?: () => void;
+};
+
+const Button = ({ text, type = "primary", onClick }: ButtonProps) => {
   const [isHovered, setIsHovered] = React.useState(false);
 
   if (type === "primary") {
@@ -12,6 +19,7 @@ const Button = ({ text, type = "primary" }: { text: string; type?: "primary" | "
         }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        onClick={onClick}
       >
         {text}
       </button>
@@ -27,6 +35,7 @@ const Button = ({ text, type = "primary" }: { text: string; type?: "primary" | "
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onClick={onClick}
     >
       {text}
     </button>
