@@ -55,7 +55,7 @@ const InputField: React.FC<InputFieldProps> = ({
         >
           <option value="">Selecteer</option>
           <option value="small">Klein</option>
-          <option value="medium">Middel</option>
+          <option value="medium">Gemiddeld</option>
           <option value="large">Groot</option>
         </select>
       )}

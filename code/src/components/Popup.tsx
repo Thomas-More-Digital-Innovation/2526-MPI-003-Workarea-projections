@@ -6,6 +6,7 @@ import Button from "./Button";
 import { XMarkIcon } from "@heroicons/react/20/solid";
 import { CloudArrowUpIcon, ArrowUpOnSquareIcon, ArrowDownOnSquareIcon } from "@heroicons/react/24/outline";
 import InputField from "@/components/InputField";
+import GridPreset from "./gridPreset";
 
 const Popup = ({ popupType }: { popupType: string }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -28,7 +29,8 @@ const Popup = ({ popupType }: { popupType: string }) => {
     popupType === "imageUpload" ? "Foto Toevoegen" :
       popupType === "exportImport" ? "Importeer / Exporteer Presets" :
         popupType === "removeImage" ? "Foto Verwijderen" :
-          "Popup";
+          popupType === "gridPreset" ? "Grid Toevoegen" :
+            "Popup";
 
 
   const [amount, setAmount] = useState("");
@@ -77,31 +79,42 @@ const Popup = ({ popupType }: { popupType: string }) => {
         )}
 
         {popupType === "gridPreset" && (
-          <div className="w-full flex justify-center">
-            <div className="my-2 mx-1 flex flex-row gap-6 max-w-5xl mx-auto">
-              <InputField
-                type="textField"
-                label="Aantal"
-                hint="Aantal vormen"
-                value={amount}
-                onChange={setAmount}
-              />
+          <div>
+            <div className="w-full flex justify-center">
+              <div className="my-2 mx-1 flex flex-row gap-6 max-w-5xl mx-auto">
+                <InputField
+                  type="textField"
+                  label="Aantal"
+                  hint="Aantal vormen"
+                  value={amount}
+                  onChange={setAmount}
+                />
 
-              <InputField
-                type="shapeDropdown"
-                label="Vorm"
-                value={shape}
-                onChange={setShape}
-              />
+                <InputField
+                  type="shapeDropdown"
+                  label="Vorm"
+                  value={shape}
+                  onChange={setShape}
+                />
 
-              <InputField
-                type="sizeDropdown"
-                label="Grootte"
-                value={size}
-                onChange={setSize}
-              />
+                <InputField
+                  type="sizeDropdown"
+                  label="Grootte"
+                  value={size}
+                  onChange={setSize}
+                />
+              </div>
+
             </div>
+            <div className="my-2 mx-1 flex flex-row gap-6 max-w-5xl mx-auto">
+              <p className="text-sm font-bold text-[var(--color-primary)]">Voorbeeld:</p>
+            </div>
+            <div className="w-full border border-gray-300 rounded-lg p-2 bg-white h-60">
+              <GridPreset shape="rectangle" size="medium" />
+            </div>
+          
           </div>
+
 
         )}
 
@@ -178,6 +191,18 @@ const Popup = ({ popupType }: { popupType: string }) => {
               </div>
             </div>
           )}
+
+          {popupType === "gridPreset" && (
+            <div className="flex justify-between items-center gap-4">
+              <div className="w-[282px]">
+                <Button type="secondary" text="Annuleren" />
+              </div>
+              <div className="w-[282px]">
+                <Button type="primary" text="Opslaan" />
+              </div>
+            </div>
+          )}
+          
         </div>
       </div>
     </div>
