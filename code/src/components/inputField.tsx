@@ -41,7 +41,6 @@ const InputField: React.FC<InputFieldProps> = ({
           value={value}
           onChange={(e) => onChange?.(e.target.value)}
         >
-          <option value="">Selecteer</option>
           <option value="circle">Cirkel</option>
           <option value="rectangle">Rechthoek</option>
         </select>
@@ -53,7 +52,6 @@ const InputField: React.FC<InputFieldProps> = ({
           value={value}
           onChange={(e) => onChange?.(e.target.value)}
         >
-          <option value="">Selecteer</option>
           <option value="small">Klein</option>
           <option value="medium">Gemiddeld</option>
           <option value="large">Groot</option>

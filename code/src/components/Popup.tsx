@@ -34,8 +34,8 @@ const Popup = ({ popupType }: { popupType: string }) => {
 
 
   const [amount, setAmount] = useState("");
-  const [shape, setShape] = useState("");
-  const [size, setSize] = useState("");
+  const [shape, setShape] = useState<"circle" | "rectangle">("circle");
+  const [size, setSize] = useState<"small" | "medium" | "large">("medium");
 
   return (
     <div className="p-4 bg-[var(--color-popup)] rounded-2xl shadow relative max-w-[609px] w-[80%] md:w-[40%]">
@@ -106,13 +106,15 @@ const Popup = ({ popupType }: { popupType: string }) => {
               </div>
 
             </div>
-            <div className="my-2 mx-1 flex flex-row gap-6 max-w-5xl mx-auto">
-              <p className="text-sm font-bold text-[var(--color-primary)]">Voorbeeld:</p>
+            <div className="mx-auto">
+              <div className="my-2 flex flex-row gap-6 max-w-5xl mx-auto">
+                <p className="text-sm font-bold text-[var(--color-primary)]">Voorbeeld:</p>
+              </div>
+              <div className="w-full border border-gray-300 rounded-lg p-4 bg-white">
+                <GridPreset shape={shape} size={size} scale={0.3} total={parseInt(amount)} />
+              </div>
             </div>
-            <div className="w-full border border-gray-300 rounded-lg p-2 bg-white h-60">
-              <GridPreset shape="rectangle" size="medium" />
-            </div>
-          
+
           </div>
 
 
@@ -202,7 +204,7 @@ const Popup = ({ popupType }: { popupType: string }) => {
               </div>
             </div>
           )}
-          
+
         </div>
       </div>
     </div>
