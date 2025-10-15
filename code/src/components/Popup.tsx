@@ -36,12 +36,12 @@ const Popup = ({ popupType }: { popupType: string }) => {
         onChange={handleFileChange}
         style={{ display: "none" }}
       />
-      <button className="absolute top-3 right-3">
-        <XMarkIcon className="h-8 w-8 text-[var(--color-text)]" />
+      <button className="absolute top-4 right-3">
+        <XMarkIcon className="h-6 w-6s text-[var(--color-text)] cursor-pointer" />
       </button>
 
       <div className="flex flex-col items-center">
-        <h2 className="text-lg font-bold text-[var(--color-text)] mb-4">{title}</h2>
+        <h2 className="text-xl font-bold text-[var(--color-primary)] mb-4">{title}</h2>
         <hr className="w-full mb-4 border-1 rounded-2xl border-gray-400" />
 
         {popupType === "imageUpload" && (
