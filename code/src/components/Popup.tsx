@@ -1,9 +1,12 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
+
 import Button from "./Button";
 import { XMarkIcon } from "@heroicons/react/20/solid";
 import { CloudArrowUpIcon, ArrowUpOnSquareIcon, ArrowDownOnSquareIcon } from "@heroicons/react/24/outline";
+import InputField from "@/components/InputField";
+import GridPreset from "./gridPreset";
 
 type PopupProps = {
   popupType: string;
@@ -28,10 +31,16 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
   const images = Array(3).fill("praline.jpeg");
 
   const title =
-    popupType === "imageUpload" ? "Foto Toevoegen" : 
-    popupType === "exportImport" ? "Importeer / Exporteer Presets" : 
-    popupType === "removeImage" ? "Foto Verwijderen": 
-    "Popup";
+    popupType === "imageUpload" ? "Foto Toevoegen" :
+      popupType === "exportImport" ? "Importeer / Exporteer Presets" :
+        popupType === "removeImage" ? "Foto Verwijderen" :
+          popupType === "gridPreset" ? "Grid Toevoegen" :
+            "Popup";
+
+
+  const [amount, setAmount] = useState("");
+  const [shape, setShape] = useState<"circle" | "rectangle">("circle");
+  const [size, setSize] = useState<"small" | "medium" | "large">("medium");
 
   return (
     <div className="p-4 bg-[var(--color-popup)] rounded-2xl shadow relative max-w-[609px] w-[80%] md:w-[40%]">
@@ -60,7 +69,7 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
               <p className="text-gray-400">PNG, JPG, GIF tot 5MB</p>
             </div>
 
-            <p className="my-3 text-xl text-[var(--color-text)]">Of kies uit eerdere foto's</p>
+            <p className="my-3 text-xl text-[var(--color-text)]">Of kies uit eerdere foto&apos;s</p>
             <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mb-6">
               {images.map((src, idx) => (
                 <img
@@ -75,12 +84,50 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
         )}
 
         {popupType === "gridPreset" && (
-          <div>{/* Hier komt code wat getoond moet worden */}</div>
+          <div>
+            <div className="w-full flex justify-center">
+              <div className="my-2 mx-1 flex flex-row gap-6 max-w-5xl mx-auto">
+                <InputField
+                  type="textField"
+                  label="Aantal"
+                  hint="Aantal vormen"
+                  value={amount}
+                  onChange={setAmount}
+                />
+
+                <InputField
+                  type="shapeDropdown"
+                  label="Vorm"
+                  value={shape}
+                  onChange={setShape}
+                />
+
+                <InputField
+                  type="sizeDropdown"
+                  label="Grootte"
+                  value={size}
+                  onChange={setSize}
+                />
+              </div>
+
+            </div>
+            <div className="mx-auto">
+              <div className="my-2 flex flex-row gap-6 max-w-5xl mx-auto">
+                <p className="text-sm font-bold text-[var(--color-primary)]">Voorbeeld:</p>
+              </div>
+              <div className="w-full h-50 border border-gray-300 rounded-lg p-4 bg-white flex items-center justify-center">
+                <GridPreset shape={shape} size={size} scale={0.3} total={parseInt(amount)} />
+              </div>
+            </div>
+
+          </div>
+
+
         )}
 
         {popupType === "exportImport" && (
           <div className="w-full flex justify-center">
-             <div 
+            <div
               className="w-[95%] h-[25vw] m-2 flex justify-center items-center rounded-2xl shadow cursor-pointer transition-colors duration-200"
               style={{ backgroundColor: hoveredBox === 'import' ? 'var(--hover-white)' : 'var(--color-white)' }}
               onMouseEnter={() => setHoveredBox('import')}
@@ -91,7 +138,7 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
                 <p className="mt-4 text-4xl font-semibold">Import</p>
               </div>
             </div>
-            <div 
+            <div
               className="w-[95%] h-[25vw] m-2 flex justify-center items-center rounded-2xl shadow cursor-pointer transition-colors duration-200"
               style={{ backgroundColor: hoveredBox === 'export' ? 'var(--hover-white)' : 'var(--color-white)' }}
               onMouseEnter={() => setHoveredBox('export')}
@@ -106,19 +153,19 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
         )}
 
         {popupType === "removeImage" && (
-            <div className="flex-col">
-               <div className="flex justify-center">
-                 <img
-                  src="praline.jpeg"
-                  alt="doosje praline"
-                  className="w-70 h-70 object-cover rounded-2xl shadow"
-                    />
-                </div>
-            <p className="mt-8 mb-8 text-3xl">    
+          <div className="flex-col">
+            <div className="flex justify-center">
+              <img
+                src="praline.jpeg"
+                alt="doosje praline"
+                className="w-70 h-70 object-cover rounded-2xl shadow"
+              />
+            </div>
+            <p className="mt-8 mb-8 text-3xl">
               Ben je zeker dat je dit wilt verwijderen?
             </p>
 
-            </div>
+          </div>
         )}
 
         <div className="w-full mt-4">
@@ -151,6 +198,18 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
               </div>
             </div>
           )}
+
+          {popupType === "gridPreset" && (
+            <div className="flex justify-between items-center gap-4">
+              <div className="w-[282px]">
+                <Button type="secondary" text="Annuleren" />
+              </div>
+              <div className="w-[282px]">
+                <Button type="primary" text="Opslaan" />
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
     </div>

@@ -2,12 +2,13 @@
 
 import React, { useState } from "react";
 
+import Link from "next/link";
 import { CheckIcon, Bars3Icon, XMarkIcon } from "@heroicons/react/24/solid";
-
 import Dropdown from "./Dropdown";
 import Button from "./Button";
 import Popup from "./Popup";
 import { useRouter } from "next/navigation";
+
 
 const Navbar: React.FC = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);

@@ -5,43 +5,48 @@ interface ShapeProps {
   shape: "circle" | "rectangle";
   size: "small" | "medium" | "large";
   completed?: boolean;
+  scale?: number; // 👈 nieuwe prop
 }
 
-const Shape: React.FC<ShapeProps> = ({ shape, size, completed = false }) => {
-
+const Shape: React.FC<ShapeProps> = ({
+  shape,
+  size,
+  completed = false,
+  scale = 1,
+}) => {
   const sizeStyles =
     shape === "circle"
       ? {
-          small: { width: "10vw", height: "10vw" },
-          medium: { width: "15vw", height: "15vw" },
-          large: { width: "20vw", height: "20vw" },
+          small: { width: `${10 * scale}vw`, height: `${10 * scale}vw` },
+          medium: { width: `${15 * scale}vw`, height: `${15 * scale}vw` },
+          large: { width: `${20 * scale}vw`, height: `${20 * scale}vw` },
         }[size]
       : {
-          small: { width: "12vw", height: "6vw" },
-          medium: { width: "18vw", height: "9vw" },
-          large: { width: "24vw", height: "12vw" },
+          small: { width: `${12 * scale}vw`, height: `${6 * scale}vw` },
+          medium: { width: `${18 * scale}vw`, height: `${9 * scale}vw` },
+          large: { width: `${24 * scale}vw`, height: `${12 * scale}vw` },
         }[size];
 
   const borderColor = completed ? "border-green-500" : "border-foreground";
 
   const badgeSize =
     size === "small"
-      ? { width: "2.5vw", height: "2.5vw", icon: "1.2vw" }
+      ? { width: `${2.5 * scale}vw`, height: `${2.5 * scale}vw`, icon: `${1.2 * scale}vw` }
       : size === "medium"
-      ? { width: "3vw", height: "3vw", icon: "1.5vw" }
-      : { width: "4vw", height: "4vw", icon: "2vw" };
-      
+      ? { width: `${3 * scale}vw`, height: `${3 * scale}vw`, icon: `${1.5 * scale}vw` }
+      : { width: `${4 * scale}vw`, height: `${4 * scale}vw`, icon: `${2 * scale}vw` };
+
   const badgeOffset =
     shape === "circle"
       ? {
-          small: { top: "0vw", right: "0vw" },
-          medium: { top: "0.5vw", right: "0.5vw" },
-          large: { top: "1vw", right: "1vw" },
+          small: { top: `${0 * scale}vw`, right: `${0 * scale}vw` },
+          medium: { top: `${0.5 * scale}vw`, right: `${0.5 * scale}vw` },
+          large: { top: `${1 * scale}vw`, right: `${1 * scale}vw` },
         }[size]
       : {
-          small: { top: "-1vw", right: "-1vw" },
-          medium: { top: "-1.5vw", right: "-1.5vw" },
-          large: { top: "-2vw", right: "-2vw" },
+          small: { top: `${-1 * scale}vw`, right: `${-1 * scale}vw` },
+          medium: { top: `${-1.5 * scale}vw`, right: `${-1.5 * scale}vw` },
+          large: { top: `${-2 * scale}vw`, right: `${-2 * scale}vw` },
         }[size];
 
   return (
@@ -50,7 +55,7 @@ const Shape: React.FC<ShapeProps> = ({ shape, size, completed = false }) => {
       <div
         style={sizeStyles}
         className={`border-2 ${borderColor} ${
-          shape === "circle" ? "rounded-full" : ""
+          shape === "circle" ? "rounded-full" : "rounded-lg"
         }`}
       >
         {/* Completed badge */}
@@ -65,7 +70,10 @@ const Shape: React.FC<ShapeProps> = ({ shape, size, completed = false }) => {
             }}
           >
             <CheckIcon
-              style={{ width: badgeSize.icon, height: badgeSize.icon }}
+              style={{
+                width: badgeSize.icon,
+                height: badgeSize.icon,
+              }}
               className="text-white"
             />
           </div>
