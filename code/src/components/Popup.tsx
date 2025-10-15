@@ -110,7 +110,7 @@ const Popup = ({ popupType }: { popupType: string }) => {
               <div className="my-2 flex flex-row gap-6 max-w-5xl mx-auto">
                 <p className="text-sm font-bold text-[var(--color-primary)]">Voorbeeld:</p>
               </div>
-              <div className="w-full border border-gray-300 rounded-lg p-4 bg-white">
+              <div className="w-full h-50 border border-gray-300 rounded-lg p-4 bg-white flex items-center justify-center">
                 <GridPreset shape={shape} size={size} scale={0.3} total={parseInt(amount)} />
               </div>
             </div>

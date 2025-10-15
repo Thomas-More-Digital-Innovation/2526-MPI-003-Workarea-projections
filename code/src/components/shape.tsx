@@ -55,7 +55,7 @@ const Shape: React.FC<ShapeProps> = ({
       <div
         style={sizeStyles}
         className={`border-2 ${borderColor} ${
-          shape === "circle" ? "rounded-full" : ""
+          shape === "circle" ? "rounded-full" : "rounded-lg"
         }`}
       >
         {/* Completed badge */}
