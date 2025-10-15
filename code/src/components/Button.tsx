@@ -6,7 +6,7 @@ const Button = ({ text, type = "primary" }: { text: string; type?: "primary" | "
   if (type === "primary") {
     return (
       <button
-        className="w-full p-4 text-[var(--color-white)] font-bold text-lg rounded-2xl transition-colors duration-200 cursor-pointer"
+        className="w-full p-4 text-[var(--color-white)] font-bold text-lg rounded-2xl transition-colors duration-200 cursor-pointer shadow-2xl"
         style={{
           backgroundColor: isHovered ? "var(--hover-primary)" : "var(--color-primary)",
         }}
@@ -21,7 +21,7 @@ const Button = ({ text, type = "primary" }: { text: string; type?: "primary" | "
   // Secondary button
   return (
     <button
-      className="border-2 border-[var(--color-primary)] w-full p-4 text-[var(--color-primary)] font-bold text-lg rounded-2xl transition-colors duration-200 cursor-pointer"
+      className="border-2 border-[var(--color-primary)] w-full p-4 text-[var(--color-primary)] font-bold text-lg rounded-2xl transition-colors duration-200 cursor-pointer shadow-2xl"
       style={{
         backgroundColor: isHovered ? "var(--hover-white)" : "var(--color-white)",
       }}

@@ -24,12 +24,12 @@ const Popup = ({ popupType }: { popupType: string }) => {
 
   const title =
     popupType === "imageUpload" ? "Foto Toevoegen" : 
-    popupType === "exportImport" ? "Importeren / Exporteren" : 
-    popupType === "removeImage" ? "Afbeelding verwijderen": 
+    popupType === "exportImport" ? "Importeer / Exporteer Presets" : 
+    popupType === "removeImage" ? "Foto Verwijderen": 
     "Popup";
 
   return (
-    <div className="p-4 bg-[var(--color-popup)] rounded-2xl shadow relative max-h-[675px] w-[80%] md:w-[40%]">
+    <div className="p-4 bg-[var(--color-popup)] rounded-2xl shadow relative max-w-[609px] w-[80%] md:w-[40%]">
       <input
         type="file"
         ref={fileInputRef}
@@ -110,7 +110,7 @@ const Popup = ({ popupType }: { popupType: string }) => {
                     />
                 </div>
             <p className="mt-8 mb-8 text-3xl">    
-             Ben je zeker dat je dit wilt verwijderen?
+              Ben je zeker dat je dit wilt verwijderen?
             </p>
 
             </div>
