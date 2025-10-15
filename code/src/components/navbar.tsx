@@ -1,67 +1,101 @@
 "use client";
 
 import React, { useState } from "react";
+
 import Link from "next/link";
+import { CheckIcon, Bars3Icon, XMarkIcon } from "@heroicons/react/24/solid";
+import Dropdown from "./Dropdown";
+import Button from "./Button";
+import Popup from "./Popup";
+import { useRouter } from "next/navigation";
+
 
 const Navbar: React.FC = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [showPopup, setShowPopup] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const router = useRouter();
+
+  function handleFotoBeheer() {
+    router.push("/foto-beheer");
+  }
+
+  function handlePresets() {
+    setShowPopup(true);
+  }
+
+  function handleClosePopup() {
+    setShowPopup(false);
+  }
 
   return (
-    <nav className="bg-white shadow-md px-6 py-3 flex items-center justify-between">
+  <nav className={`bg-white shadow-md px-6 py-3 flex items-center justify-between m-2 relative ${mobileMenuOpen ? 'rounded-t-2xl rounded-b-none' : 'rounded-2xl'}`}> 
       {/* Links: Titel */}
-      <div className="text-xl font-bold text-gray-800">MPI Projectie Tool</div>
+      <div className="text-4xl font-semibold text-[var(--dark-text)]">
+        MPI Projectie Tool
+      </div>
 
-      {/* Midden: Zoekbalk */}
-      <div className="flex-1 mx-6">
+      {/* Midden: Zoekbalk (hidden on mobile, centered on desktop) */}
+      <div className="hidden md:block absolute left-0 right-0 mx-auto" style={{maxWidth: '400px'}}>
         <input
           type="text"
           placeholder="Zoeken..."
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-4 py-4 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
         />
       </div>
 
-      {/* Rechts: Knop en Dropdown */}
-      <div className="flex items-center space-x-4 relative">
-        <button className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
-          Toevoegen
-        </button>
-
-        {/* Dropdown */}
-        <div className="relative">
-          <button
-            onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 flex items-center space-x-1"
-          >
-            <span>Extra</span>
-            <svg
-              className={`w-4 h-4 transition-transform ${
-                dropdownOpen ? "rotate-180" : ""
-              }`}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
-          </button>
-
-          {dropdownOpen && (
-            <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-              <button className="w-full text-left px-4 py-2 hover:bg-gray-100">
-                Foto beheer
-              </button>
-              <button className="w-full text-left px-4 py-2 hover:bg-gray-100">
-                Imp/Exp Presets
-              </button>
-            </div>
-          )}
-        </div>
+      {/* Rechts: Knop en Dropdown (hidden on mobile) */}
+      <div className="hidden md:flex items-center space-x-4 relative">
+        <Button type="primary" text="Toevoegen" />
+        <Dropdown>
+          <Dropdown.Button>Extra</Dropdown.Button>
+          <Dropdown.Menu>
+            <Dropdown.Item onClick={handleFotoBeheer}>Foto Beheer</Dropdown.Item>
+            <Dropdown.Item onClick={handlePresets}>Imp/Exp presets</Dropdown.Item> 
+          </Dropdown.Menu>
+        </Dropdown>
       </div>
+
+      {/* Burger menu icon (visible on mobile only) */}
+      <button
+        className="md:hidden p-2 rounded focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+        onClick={() => setMobileMenuOpen((open) => !open)}
+        aria-label="Open menu"
+      >
+        {mobileMenuOpen ? (
+          <XMarkIcon className="h-8 w-8 text-[var(--color-primary)]" />
+        ) : (
+          <Bars3Icon className="h-8 w-8 text-[var(--color-primary)]" />
+        )}
+      </button>
+
+      {/* Mobile dropdown menu (not overlay) */}
+      {mobileMenuOpen && (
+        <div className="absolute left-0 right-0 top-full py-4 bg-white rounded-b-2xl shadow-lg z-40 flex flex-col items-center md:hidden animate-fadeIn">
+          <input
+            type="text"
+            placeholder="Zoeken..."
+            className="w-11/12 mb-4 mt-4 px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
+          />
+          <div className="w-11/12 mb-4">
+            <Button type="primary" text="Toevoegen" />
+          </div>
+          <Dropdown>
+            <Dropdown.Button>Extra</Dropdown.Button>
+            <Dropdown.Menu>
+              <Dropdown.Item onClick={handleFotoBeheer}>Foto Beheer</Dropdown.Item>
+              <Dropdown.Item onClick={handlePresets}>Imp/Exp presets</Dropdown.Item>
+            </Dropdown.Menu>
+          </Dropdown>
+        </div>
+      )}
+
+      {/* Popup overlay (always on top) */}
+      {showPopup && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/90 bg-opacity-40 z-50">
+          <Popup popupType="exportImport" onClose={handleClosePopup} />
+        </div>
+      )}
     </nav>
   );
 };
