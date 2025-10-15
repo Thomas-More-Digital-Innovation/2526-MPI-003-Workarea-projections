@@ -1,8 +1,16 @@
+'use client'
+
 import Navbar from "@/components/navbar";
+import Dropdown from "@/components/Dropdown";
+import Button from "@/components/Button";
+import Popup from "@/components/Popup";
+import React, { useState } from "react";
 
 export default function Home() {
+  const [showPopup, setShowPopup] = useState(false);
+ 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[var(--color-secondary)]/20">
       {/* Navbar bovenaan */}
       <Navbar />
 
@@ -10,7 +18,15 @@ export default function Home() {
       <main className="p-6">
         <h1 className="text-2xl font-bold">Welkom bij MPI Projectie Tool</h1>
         <p className="mt-4">Hier komt de rest van je content...</p>
+       
+       {/* <Button type="primary" text="hello" onClick={() => setShowPopup(true)} />
+        {showPopup && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black/80 z-50">
+            <Popup  popupType="imageUpload" />
+            <button className="absolute top-4 right-4 text-white text-2xl" onClick={() => setShowPopup(false)}>&times;</button>
+          </div>
+        )}*/}
       </main>
     </div>
   );
-}
+} 

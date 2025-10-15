@@ -5,7 +5,12 @@ import Button from "./Button";
 import { XMarkIcon } from "@heroicons/react/20/solid";
 import { CloudArrowUpIcon, ArrowUpOnSquareIcon, ArrowDownOnSquareIcon } from "@heroicons/react/24/outline";
 
-const Popup = ({ popupType }: { popupType: string }) => {
+type PopupProps = {
+  popupType: string;
+  onClose?: () => void;
+};
+
+const Popup = ({ popupType, onClose }: PopupProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [hoveredBox, setHoveredBox] = React.useState<'export' | 'import' | null>(null);
 
@@ -36,12 +41,12 @@ const Popup = ({ popupType }: { popupType: string }) => {
         onChange={handleFileChange}
         style={{ display: "none" }}
       />
-      <button className="absolute top-4 right-3">
-        <XMarkIcon className="h-6 w-6s text-[var(--color-text)] cursor-pointer" />
+      <button className="absolute top-4 right-3" onClick={onClose}>
+        <XMarkIcon className="h-6 w-6s text-[var(--dark-text)] cursor-pointer" />
       </button>
 
       <div className="flex flex-col items-center">
-        <h2 className="text-xl font-bold text-[var(--color-primary)] mb-4">{title}</h2>
+        <h2 className="text-2xl font-semibold text-[var(--dark-text)] mb-4">{title}</h2>
         <hr className="w-full mb-4 border-1 rounded-2xl border-gray-400" />
 
         {popupType === "imageUpload" && (
@@ -75,6 +80,17 @@ const Popup = ({ popupType }: { popupType: string }) => {
 
         {popupType === "exportImport" && (
           <div className="w-full flex justify-center">
+             <div 
+              className="w-[95%] h-[25vw] m-2 flex justify-center items-center rounded-2xl shadow cursor-pointer transition-colors duration-200"
+              style={{ backgroundColor: hoveredBox === 'import' ? 'var(--hover-white)' : 'var(--color-white)' }}
+              onMouseEnter={() => setHoveredBox('import')}
+              onMouseLeave={() => setHoveredBox(null)}
+            >
+              <div className="flex-col justify-center text-center">
+                <ArrowDownOnSquareIcon className="h-30 w-30 text-[var(--color-primary)]"/>
+                <p className="mt-4 text-4xl font-semibold">Import</p>
+              </div>
+            </div>
             <div 
               className="w-[95%] h-[25vw] m-2 flex justify-center items-center rounded-2xl shadow cursor-pointer transition-colors duration-200"
               style={{ backgroundColor: hoveredBox === 'export' ? 'var(--hover-white)' : 'var(--color-white)' }}
@@ -83,18 +99,7 @@ const Popup = ({ popupType }: { popupType: string }) => {
             >
               <div className="flex-col justify-center text-center">
                 <ArrowUpOnSquareIcon className="h-30 w-30 text-[var(--color-primary)]"/>
-                <p className="mt-4 text-4xl">Export</p>
-              </div>
-            </div>
-            <div 
-              className="w-[95%] h-[25vw] m-2 flex justify-center items-center rounded-2xl shadow cursor-pointer transition-colors duration-200"
-              style={{ backgroundColor: hoveredBox === 'import' ? 'var(--hover-white)' : 'var(--color-white)' }}
-              onMouseEnter={() => setHoveredBox('import')}
-              onMouseLeave={() => setHoveredBox(null)}
-            >
-              <div className="flex-col justify-center text-center">
-                <ArrowDownOnSquareIcon className="h-30 w-30 text-[var(--color-primary)]"/>
-                <p className="mt-4 text-4xl">Import</p>
+                <p className="mt-4 text-4xl font-semibold">Export</p>
               </div>
             </div>
           </div>
@@ -120,7 +125,7 @@ const Popup = ({ popupType }: { popupType: string }) => {
           {popupType === "removeImage" && (
             <div className="flex justify-between items-center">
               <div className="w-[282px]">
-                <Button type="secondary" text="Terug" />
+                <Button type="secondary" text="Terug" onClick={onClose} />
               </div>
               <div className="w-[282px]">
                 <Button type="primary" text="Verwijderen" />
@@ -131,7 +136,7 @@ const Popup = ({ popupType }: { popupType: string }) => {
           {popupType === "exportImport" && (
             <div className="flex justify-center">
               <div className="w-[282px]">
-                <Button type="secondary" text="Terug" />
+                <Button type="secondary" text="Terug" onClick={onClose} />
               </div>
             </div>
           )}
@@ -139,7 +144,7 @@ const Popup = ({ popupType }: { popupType: string }) => {
           {popupType === "imageUpload" && (
             <div className="flex justify-between items-center">
               <div className="w-[282px]">
-                <Button type="secondary" text="Annuleren" />
+                <Button type="secondary" text="Annuleren" onClick={onClose} />
               </div>
               <div className="w-[282px]">
                 <Button type="primary" text="Opslaan" />
