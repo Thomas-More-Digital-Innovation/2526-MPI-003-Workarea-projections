@@ -4,9 +4,9 @@ import React, { useState } from "react";
 
 import Link from "next/link";
 import { CheckIcon, Bars3Icon, XMarkIcon } from "@heroicons/react/24/solid";
-import Dropdown from "./Dropdown";
-import Button from "./Button";
-import Popup from "./Popup";
+import Dropdown from "../ui/Dropdown";
+import Button from "../ui/Button";
+import Popup from "../ui/Popup";
 import { useRouter } from "next/navigation";
 
 

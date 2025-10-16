@@ -1,10 +1,7 @@
 
 "use client";
 
-import Navbar from "@/components/navbar";
-import Dropdown from "@/components/Dropdown";
-import Button from "@/components/Button";
-import Popup from "@/components/Popup";
+import { Navbar, Button, Popup } from "@/components";
 import { useState } from "react";
 
 
@@ -31,9 +28,9 @@ export default function Home() {
             <Popup  popupType="imageUpload" />
             <button className="absolute top-4 right-4 text-white text-2xl" onClick={() => setShowPopup(false)}>&times;</button>
           </div>
-        )}*/}
+        )} */}
       </main>
       {showPopup && <Popup popupType="gridPreset" />}
     </div>
   );
-} 
+}
