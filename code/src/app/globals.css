@@ -10,7 +10,9 @@
   --color-white: #F6F6F6;
   --hover-primary:#00626b;
   --hover-secondary: #10909c;
+  --hover-white: #e5e3e3;
   --color-yellow: #FCFFE6;
+  --dark-text: #004248;
 }
 
 @theme inline {
