@@ -1,8 +1,9 @@
 {
+  "type": "module",
   "name": "work-area-projection",
   "version": "0.1.0",
   "private": true,
-  "main": "electron/main.js",
+  "main": "electron/main.mjs",
   "build": {
     "appId": "com.digital-innovation.work-area-projection",
     "files": [
@@ -22,15 +23,19 @@
     "electron-build": "npm run build && electron ."
   },
   "dependencies": {
+    "autoprefixer": "^10.4.21",
+    "better-sqlite3": "^12.4.1",
+    "lucide-react": "^0.545.0",
     "@heroicons/react": "^2.2.0",
     "next": "15.5.4",
+    "postcss": "^8.5.6",
     "react": "19.1.0",
     "react-dom": "19.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@tailwindcss/postcss": "^4.1.14",
+    "@types/node": "^20.19.21",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "concurrently": "^9.2.1",
@@ -39,7 +44,7 @@
     "electron-builder": "^26.0.12",
     "eslint": "^9",
     "eslint-config-next": "15.5.4",
-    "tailwindcss": "^4",
+    "tailwindcss": "^4.1.14",
     "typescript": "^5",
     "wait-on": "^9.0.1"
   }
