@@ -1,11 +1,10 @@
 import React from "react";
 
-
-type ButtonProps = {
+interface ButtonProps {
   text: string;
   type?: "primary" | "secondary";
   onClick?: () => void;
-};
+}
 
 const Button = ({ text, type = "primary", onClick }: ButtonProps) => {
   const [isHovered, setIsHovered] = React.useState(false);

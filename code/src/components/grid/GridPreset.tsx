@@ -1,29 +1,28 @@
 import React, { useState } from "react";
-import Shape from "./shape";
+import Shape from "./Shape";
 import { ArrowLeftCircleIcon, ArrowRightCircleIcon } from "@heroicons/react/24/solid";
 
 interface GridPresetProps {
   shape: "circle" | "rectangle";
   size: "small" | "medium" | "large";
-  scale?: number; // Optionele schaalfactor
+  scale?: number;
   total: number;
   perPage?: number;
 }
 
-const GridPreset: React.FC<GridPresetProps> = ({ shape, size, scale = 1, total, perPage = total }) => {
-  const gridConfig: Record<
-    string,
-    { rows: number; cols: number; maxPerPage: number }
-  > = {
-    "rectangle-small": { rows: 3, cols: 5, maxPerPage: 15 },
-    "rectangle-medium": { rows: 2, cols: 4, maxPerPage: 8 },
-    "rectangle-large": { rows: 2, cols: 3, maxPerPage: 6 },
-    "circle-small": { rows: 3, cols: 5, maxPerPage: 15 },
-    "circle-medium": { rows: 2, cols: 4, maxPerPage: 8 },
-    "circle-large": { rows: 1, cols: 4, maxPerPage: 4 },
-  };
+const GRID_CONFIG = {
+  "rectangle-small": { rows: 3, cols: 5, maxPerPage: 15 },
+  "rectangle-medium": { rows: 2, cols: 4, maxPerPage: 8 },
+  "rectangle-large": { rows: 2, cols: 3, maxPerPage: 6 },
+  "circle-small": { rows: 3, cols: 5, maxPerPage: 15 },
+  "circle-medium": { rows: 2, cols: 4, maxPerPage: 8 },
+  "circle-large": { rows: 1, cols: 4, maxPerPage: 4 },
+} as const;
 
-  const key = `${shape}-${size}`;
+const GridPreset: React.FC<GridPresetProps> = ({ shape, size, scale = 1, total, perPage = total }) => {
+  const gridConfig = GRID_CONFIG;
+
+  const key = `${shape}-${size}` as keyof typeof GRID_CONFIG;
   const config = gridConfig[key];
   const effectivePerPage = Math.min(perPage, config.maxPerPage);
   const totalPages = Math.ceil(total / effectivePerPage);

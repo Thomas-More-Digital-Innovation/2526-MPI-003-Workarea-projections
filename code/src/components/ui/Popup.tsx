@@ -5,13 +5,20 @@ import React, { useRef, useState } from "react";
 import Button from "./Button";
 import { XMarkIcon } from "@heroicons/react/20/solid";
 import { CloudArrowUpIcon, ArrowUpOnSquareIcon, ArrowDownOnSquareIcon } from "@heroicons/react/24/outline";
-import InputField from "@/components/InputField";
-import GridPreset from "./gridPreset";
+import InputField from "../forms/InputField";
+import GridPreset from "../grid/GridPreset";
 
-type PopupProps = {
-  popupType: string;
+interface PopupProps {
+  popupType: "imageUpload" | "exportImport" | "removeImage" | "gridPreset";
   onClose?: () => void;
-};
+}
+
+const POPUP_TITLES = {
+  imageUpload: "Foto Toevoegen",
+  exportImport: "Importeer / Exporteer Presets",
+  removeImage: "Foto Verwijderen",
+  gridPreset: "Grid Toevoegen",
+} as const;
 
 const Popup = ({ popupType, onClose }: PopupProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -30,17 +37,25 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
 
   const images = Array(3).fill("praline.jpeg");
 
-  const title =
-    popupType === "imageUpload" ? "Foto Toevoegen" :
-      popupType === "exportImport" ? "Importeer / Exporteer Presets" :
-        popupType === "removeImage" ? "Foto Verwijderen" :
-          popupType === "gridPreset" ? "Grid Toevoegen" :
-            "Popup";
+  const title = POPUP_TITLES[popupType] || "Popup";
 
 
   const [amount, setAmount] = useState("");
   const [shape, setShape] = useState<"circle" | "rectangle">("circle");
   const [size, setSize] = useState<"small" | "medium" | "large">("medium");
+
+  // Helper functions to handle type conversions for InputField
+  const handleShapeChange = (value: string) => {
+    if (value === "circle" || value === "rectangle") {
+      setShape(value);
+    }
+  };
+
+  const handleSizeChange = (value: string) => {
+    if (value === "small" || value === "medium" || value === "large") {
+      setSize(value);
+    }
+  };
 
   return (
     <div className="p-4 bg-[var(--color-popup)] rounded-2xl shadow relative w-[50%]">
@@ -86,7 +101,7 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
         {popupType === "gridPreset" && (
           <div>
             <div>
-              <div className="mx-1 flex flex-row gap-6 mx-auto">
+              <div className="flex flex-row gap-6 mx-auto">
                 <InputField
                   type="textField"
                   label="Aantal"
@@ -99,14 +114,14 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
                   type="shapeDropdown"
                   label="Vorm"
                   value={shape}
-                  onChange={setShape}
+                  onChange={handleShapeChange}
                 />
 
                 <InputField
                   type="sizeDropdown"
                   label="Grootte"
                   value={size}
-                  onChange={setSize}
+                  onChange={handleSizeChange}
                 />
               </div>
 
