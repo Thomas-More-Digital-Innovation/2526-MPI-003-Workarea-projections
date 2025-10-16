@@ -1,7 +1,8 @@
 "use client";
 
 import { Navbar, Button, Popup } from "@/components";
-import { useState } from "react";
+import { Link } from "lucide-react";
+import { useState} from "react";
 
 
 
@@ -20,14 +21,9 @@ export default function Home() {
 
         <Button text="Grid toevoegen (tijdelijke link)" onClick={() => setShowPopup(true)} />
 
-       
-       {/* <Button type="primary" text="hello" onClick={() => setShowPopup(true)} />
-        {showPopup && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/80 z-50">
-            <Popup  popupType="imageUpload" />
-            <button className="absolute top-4 right-4 text-white text-2xl" onClick={() => setShowPopup(false)}>&times;</button>
-          </div>
-        )} */}
+        <a href="/calibration" className="text-blue-500 underline">
+          Go to Calibration System
+        </a>
       </main>
       {showPopup && <Popup popupType="gridPreset" />}
     </div>
