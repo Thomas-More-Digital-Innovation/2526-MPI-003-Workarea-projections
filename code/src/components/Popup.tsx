@@ -43,7 +43,7 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
   const [size, setSize] = useState<"small" | "medium" | "large">("medium");
 
   return (
-    <div className="p-4 bg-[var(--color-popup)] rounded-2xl shadow relative max-w-[609px] w-[80%] md:w-[40%]">
+    <div className="p-4 bg-[var(--color-popup)] rounded-2xl shadow relative w-[50%]">
       <input
         type="file"
         ref={fileInputRef}
@@ -54,8 +54,8 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
         <XMarkIcon className="h-6 w-6s text-[var(--dark-text)] cursor-pointer" />
       </button>
 
-      <div className="flex flex-col items-center">
-        <h2 className="text-2xl font-semibold text-[var(--dark-text)] mb-4">{title}</h2>
+      <div>
+        <h2 className="text-xl font-bold text-[var(--color-primary)] mb-4">{title}</h2>
         <hr className="w-full mb-4 border-1 rounded-2xl border-gray-400" />
 
         {popupType === "imageUpload" && (
@@ -85,8 +85,8 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
 
         {popupType === "gridPreset" && (
           <div>
-            <div className="w-full flex justify-center">
-              <div className="my-2 mx-1 flex flex-row gap-6 max-w-5xl mx-auto">
+            <div>
+              <div className="mx-1 flex flex-row gap-6 mx-auto">
                 <InputField
                   type="textField"
                   label="Aantal"
@@ -115,7 +115,7 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
               <div className="my-2 flex flex-row gap-6 max-w-5xl mx-auto">
                 <p className="text-sm font-bold text-[var(--color-primary)]">Voorbeeld:</p>
               </div>
-              <div className="w-full h-50 border border-gray-300 rounded-lg p-4 bg-white flex items-center justify-center">
+              <div className="w-full h-65 border border-gray-300 rounded-lg bg-white flex items-center justify-center">
                 <GridPreset shape={shape} size={size} scale={0.3} total={parseInt(amount)} />
               </div>
             </div>
