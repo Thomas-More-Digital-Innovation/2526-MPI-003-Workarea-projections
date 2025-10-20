@@ -3,8 +3,6 @@
 import { Navbar, Button, Popup } from "@/components";
 import { useState } from "react";
 
-
-
 export default function Home() {
   const [showPopup, setShowPopup] = useState(false);
   
@@ -19,17 +17,21 @@ export default function Home() {
         <p className="mt-4">Hier komt de rest van je content...</p>
 
         <Button text="Grid toevoegen (tijdelijke link)" onClick={() => setShowPopup(true)} />
+      </main>
 
-       
-       {/* <Button type="primary" text="hello" onClick={() => setShowPopup(true)} />
+      {/* <Button type="primary" text="hello" onClick={() => setShowPopup(true)} />
         {showPopup && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/80 z-50">
             <Popup  popupType="imageUpload" />
             <button className="absolute top-4 right-4 text-white text-2xl" onClick={() => setShowPopup(false)}>&times;</button>
           </div>
         )} */}
-      </main>
-      {showPopup && <Popup popupType="gridPreset" />}
+
+      {showPopup && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/80 z-50">
+          <Popup popupType="gridPreset" onClose={() => setShowPopup(false)} />
+        </div>
+      )}
     </div>
   );
 }
