@@ -12,3 +12,4 @@ export { default as Navbar } from './layout/Navbar';
 // Grid Components
 export { default as GridPreset } from './grid/GridPreset';
 export { default as Shape } from './grid/Shape';
+export { default as Footer } from './layout/Footer';

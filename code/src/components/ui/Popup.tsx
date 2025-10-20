@@ -84,7 +84,7 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
   const title = POPUP_TITLES[popupType] || "Popup";
 
   return (
-    <div className="p-4 bg-[var(--color-popup)] rounded-2xl shadow relative w-[50%]">
+    <div className="p-4 bg-[var(--color-popup)] rounded-2xl shadow relative w-[50%] z-50">
       <button className="absolute top-4 right-3" onClick={onClose}>
         <XMarkIcon className="h-6 w-6 text-[var(--dark-text)] cursor-pointer" />
       </button>
@@ -105,7 +105,7 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
               <div className="my-2 flex flex-row gap-6 max-w-5xl mx-auto">
                 <p className="text-sm font-bold text-[var(--color-primary)]">Voorbeeld:</p>
               </div>
-              <div className="w-full h-65 border border-gray-300 rounded-lg bg-white flex items-center justify-center">
+              <div className="w-full h-80 border border-gray-300 rounded-lg bg-white flex items-center justify-center">
                 <GridPreset shape={shape} size={size} scale={0.3} total={parseInt(amount)} />
               </div>
             </div>
