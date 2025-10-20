@@ -217,7 +217,7 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
           {popupType === "gridPreset" && (
             <div className="flex justify-between items-center gap-4">
               <div className="w-[282px]">
-                <Button type="secondary" text="Annuleren" />
+                <Button type="secondary" text="Annuleren"  onClick={onClose} />
               </div>
               <div className="w-[282px]">
                 <Button type="primary" text="Opslaan" />

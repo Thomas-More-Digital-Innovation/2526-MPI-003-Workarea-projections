@@ -18,9 +18,7 @@ db.prepare(`CREATE TABLE IF NOT EXISTS Task (
 
 db.prepare(`CREATE TABLE IF NOT EXISTS GridLayout (
   gridLayoutId INTEGER PRIMARY KEY AUTOINCREMENT,
-  rowAmount INTEGER NOT NULL,
-  colAmount INTEGER NOT NULL,
-  amountPerPage INTEGER NOT NULL,
+  amount INTEGER NOT NULL,
   shape TEXT NOT NULL,
   size TEXT NOT NULL
 )`).run();
@@ -63,16 +61,6 @@ if (db.prepare('SELECT COUNT(*) AS count FROM GridLayout').get().count === 0) {
 if (db.prepare('SELECT COUNT(*) AS count FROM Preset').get().count === 0) {
   db.prepare('INSERT INTO Preset (amountTotal, gridLayoutId) VALUES (?, ?)')
     .run(24, 1);
-}
-
-if (db.prepare('SELECT COUNT(*) AS count FROM Image').get().count === 0) {
-  db.prepare('INSERT INTO Image (path, description) VALUES (?, ?)')
-    .run('images/example.jpg', 'Voorbeeld afbeelding');
-}
-
-if (db.prepare('SELECT COUNT(*) AS count FROM Step').get().count === 0) {
-  db.prepare('INSERT INTO Step (taskId, presetId, imageId, step, description) VALUES (?, ?, ?, ?, ?)')
-    .run(1, 1, 1, 1, 'Eerste stap van voorbeeld');
 }
 
 // Voorbeeld uitlezen van data
