@@ -97,13 +97,13 @@ ipcMain.handle('images:addFile', async (event, file, description) => {
 });
 
 // IPC handlers voor GridLayout (grid presets):
-ipcMain.handle('presets:add', (event, { shape, size, amount }) => {
+ipcMain.handle('add-preset', (event, { shape, size, amount }) => {
   const stmt = db.prepare('INSERT INTO GridLayout (amount, shape, size) VALUES (?, ?, ?)');
   const info = stmt.run(amount, shape, size);
   return { gridLayoutId: info.lastInsertRowid, shape, size, amount };
 });
 
-ipcMain.handle('presets:getAll', () => {
+ipcMain.handle('get-presets', () => {
   return db.prepare('SELECT * FROM GridLayout').all();
 });
 
