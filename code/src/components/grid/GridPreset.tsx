@@ -29,6 +29,11 @@ const GridPreset: React.FC<GridPresetProps> = ({ shape, size, scale = 1, total, 
 
   const [page, setPage] = useState(0);
 
+  // Reset pagina naar 0 als shape, size of total veranderen
+React.useEffect(() => {
+  setPage(0);
+}, [shape, size, total]);
+
   const startIndex = page * effectivePerPage;
   const endIndex = Math.min(startIndex + effectivePerPage, total);
   const shapesArray = Array.from({ length: total }).slice(startIndex, endIndex);
