@@ -1,14 +1,25 @@
-'use client'
+"use client";
 
-import Navbar from "@/components/navbar";
-import Dropdown from "@/components/Dropdown";
-import Button from "@/components/Button";
-import Popup from "@/components/Popup";
-import React, { useState } from "react";
+import { Navbar, Button, Popup, GridCard } from "@/components";
+import { useState } from "react";
+
+interface CardData {
+  id: number;
+  title: string;
+  description: string;
+}
 
 export default function Home() {
   const [showPopup, setShowPopup] = useState(false);
- 
+  const [selectedCard, setSelectedCard] = useState<number | null>(null);
+
+  // Temporary static data (later from DB)
+  const cards: CardData[] = [
+    { id: 1, title: "Pralines verpakken", description: "Bij deze taak steek je 20 pralines in een doosje voor dat het gesloten wordt." },
+    { id: 2, title: "Test 1", description: "Bij deze taak steek je 20 pralines in een doosje voor dat het gesloten wordt." },
+    { id: 3, title: "Test 2", description: "Bij deze taak steek je 20 pralines in een doosje voor dat het gesloten wordt." },
+  ];
+
   return (
     <div className="min-h-screen bg-[var(--color-secondary)]/20">
       {/* Navbar bovenaan */}
@@ -16,17 +27,24 @@ export default function Home() {
 
       {/* Content van de pagina */}
       <main className="p-6">
-        <h1 className="text-2xl font-bold">Welkom bij MPI Projectie Tool</h1>
-        <p className="mt-4">Hier komt de rest van je content...</p>
-       
-       {/* <Button type="primary" text="hello" onClick={() => setShowPopup(true)} />
-        {showPopup && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/80 z-50">
-            <Popup  popupType="imageUpload" />
-            <button className="absolute top-4 right-4 text-white text-2xl" onClick={() => setShowPopup(false)}>&times;</button>
-          </div>
-        )}*/}
+        <Button text="Grid toevoegen (tijdelijke link)" onClick={() => setShowPopup(true)} />
+
+        {/* Dynamische GridCards */}
+        <div className="grid grid-cols-6 gap-4">
+          {cards.map((card) => (
+            <GridCard
+              key={card.id}
+              id={card.id}
+              title={card.title}
+              description={card.description}
+              active={selectedCard === card.id}
+              onSelect={setSelectedCard}
+            />
+          ))}
+        </div>
       </main>
+
+      {showPopup && <Popup popupType="gridPreset" />}
     </div>
   );
 } 

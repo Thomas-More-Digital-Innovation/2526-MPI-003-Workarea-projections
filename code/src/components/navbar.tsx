@@ -2,7 +2,15 @@
 
 import React, { useState } from "react";
 
+<<<<<<< Updated upstream:code/src/components/navbar.tsx
 import { CheckIcon, Bars3Icon, XMarkIcon } from "@heroicons/react/24/solid";
+=======
+import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/solid";
+import Dropdown from "../ui/Dropdown";
+import Button from "../ui/Button";
+import Popup from "../ui/Popup";
+import { useRouter } from "next/navigation";
+>>>>>>> Stashed changes:code/src/components/layout/Navbar.tsx
 
 import Dropdown from "./Dropdown";
 import Button from "./Button";
@@ -10,7 +18,7 @@ import Popup from "./Popup";
 import { useRouter } from "next/navigation";
 
 const Navbar: React.FC = () => {
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+  // dropdownOpen state removed (unused)
   const [showPopup, setShowPopup] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const router = useRouter();
