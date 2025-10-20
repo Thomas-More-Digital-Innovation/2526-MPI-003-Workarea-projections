@@ -96,18 +96,6 @@ ipcMain.handle('images:addFile', async (event, file, description) => {
   return { imageId: info.lastInsertRowid, path: relPath, description };
 });
 
-// IPC handlers voor GridLayout (grid presets):
-ipcMain.handle('presets:add', (event, { shape, size, amount }) => {
-  const stmt = db.prepare('INSERT INTO GridLayout (amount, shape, size) VALUES (?, ?, ?)');
-  const info = stmt.run(amount, shape, size);
-  return { gridLayoutId: info.lastInsertRowid, shape, size, amount };
-});
-
-ipcMain.handle('presets:getAll', () => {
-  return db.prepare('SELECT * FROM GridLayout').all();
-});
-
-
 function createWindow() {
   const mainWindow = new BrowserWindow({
   width: 1920,
