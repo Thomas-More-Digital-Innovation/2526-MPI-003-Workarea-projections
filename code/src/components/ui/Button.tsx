@@ -4,21 +4,25 @@ interface ButtonProps {
   text: string;
   type?: "primary" | "secondary";
   onClick?: () => void;
+  disabled?: boolean;
 }
 
-const Button = ({ text, type = "primary", onClick }: ButtonProps) => {
+const Button = ({ text, type = "primary", onClick, disabled = false }: ButtonProps) => {
   const [isHovered, setIsHovered] = React.useState(false);
 
   if (type === "primary") {
+  const hoverColor = isHovered ? "var(--hover-primary)" : "var(--color-primary)";
+  const backgroundColor = disabled ? "#9ca3af" : hoverColor;
     return (
       <button
         className="w-full text-2xl p-4 text-[var(--color-white)] font-bold rounded-2xl transition-colors duration-200 cursor-pointer shadow-2xl"
         style={{
-          backgroundColor: isHovered ? "var(--hover-primary)" : "var(--color-primary)",
+          backgroundColor,
         }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        onClick={onClick}
+        onClick={disabled ? undefined : onClick}
+        disabled={disabled}
       >
         {text}
       </button>
@@ -28,13 +32,14 @@ const Button = ({ text, type = "primary", onClick }: ButtonProps) => {
   // Secondary button
   return (
     <button
-      className="border-2 border-[var(--color-primary)] w-full p-4 text-2xl text-[var(--color-primary)] font-bold rounded-2xl transition-colors duration-200 cursor-pointer shadow-2xl"
+      className={`border-2 border-[var(--color-primary)] w-full p-4 text-2xl font-bold rounded-2xl transition-colors duration-200 shadow-2xl ${disabled ? 'text-gray-400 cursor-not-allowed' : 'text-[var(--color-primary)] cursor-pointer'}`}
       style={{
         backgroundColor: isHovered ? "var(--hover-white)" : "var(--color-white)",
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
     >
       {text}
     </button>
