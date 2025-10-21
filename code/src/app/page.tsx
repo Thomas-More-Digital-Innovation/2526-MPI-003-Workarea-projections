@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Navbar, Button, Popup, GridCard } from "@/components";
+import { Navbar, Button, Popup, GridCard, Footer } from "@/components";
 
 interface CardData {
   id: number;
@@ -96,6 +96,9 @@ export default function Home() {
           </button>
         </div>
       )}
+
+      {/*Footer*/}
+      <Footer></Footer>
     </div>
   );
 }
