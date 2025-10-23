@@ -8,6 +8,7 @@ export { default as InputField } from './forms/InputField';
 
 // Layout Components
 export { default as Navbar } from './layout/Navbar';
+export { default as GridCard} from './ui/GridCard';
 
 // Grid Components
 export { default as GridPreset } from './grid/GridPreset';
