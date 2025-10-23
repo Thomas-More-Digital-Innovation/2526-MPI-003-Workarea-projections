@@ -18,9 +18,7 @@ db.prepare(`CREATE TABLE IF NOT EXISTS Task (
 
 db.prepare(`CREATE TABLE IF NOT EXISTS GridLayout (
   gridLayoutId INTEGER PRIMARY KEY AUTOINCREMENT,
-  rowAmount INTEGER NOT NULL,
-  colAmount INTEGER NOT NULL,
-  amountPerPage INTEGER NOT NULL,
+  amount INTEGER NOT NULL,
   shape TEXT NOT NULL,
   size TEXT NOT NULL
 )`).run();
@@ -56,8 +54,8 @@ if (db.prepare('SELECT COUNT(*) AS count FROM Task').get().count === 0) {
 }
 
 if (db.prepare('SELECT COUNT(*) AS count FROM GridLayout').get().count === 0) {
-  db.prepare('INSERT INTO GridLayout (rowAmount, colAmount, amountPerPage, shape, size) VALUES (?, ?, ?, ?, ?)')
-    .run(3, 4, 12, 'rectangle', 'medium');
+  db.prepare('INSERT INTO GridLayout (amount, shape, size) VALUES (?, ?, ?)')
+    .run(12, 'rectangle', 'medium');
 }
 
 if (db.prepare('SELECT COUNT(*) AS count FROM Preset').get().count === 0) {
@@ -140,6 +138,18 @@ ipcMain.handle('images:addFile', async (event, file, description) => {
   const info = stmt.run(relPath, description);
   return { imageId: info.lastInsertRowid, path: relPath, description };
 });
+
+// IPC handlers voor GridLayout (grid presets):
+ipcMain.handle('add-preset', (event, { shape, size, amount }) => {
+  const stmt = db.prepare('INSERT INTO GridLayout (amount, shape, size) VALUES (?, ?, ?)');
+  const info = stmt.run(amount, shape, size);
+  return { gridLayoutId: info.lastInsertRowid, shape, size, amount };
+});
+
+ipcMain.handle('get-presets', () => {
+  return db.prepare('SELECT * FROM GridLayout').all();
+});
+
 
 function createWindow() {
   const mainWindow = new BrowserWindow({

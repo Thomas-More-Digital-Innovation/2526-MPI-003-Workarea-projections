@@ -1,12 +1,20 @@
 "use client";
 
 import React, { useRef, useState } from "react";
-
 import Button from "./Button";
 import { XMarkIcon } from "@heroicons/react/20/solid";
 import { CloudArrowUpIcon, ArrowUpOnSquareIcon, ArrowDownOnSquareIcon } from "@heroicons/react/24/outline";
 import InputField from "../forms/InputField";
 import GridPreset from "../grid/GridPreset";
+
+declare global {
+  interface Window {
+    electronAPI?: {
+      addPreset: (preset: { shape: string; size: string; amount: number }) => Promise<unknown>;
+      getPresets: () => Promise<Array<{ id: number; shape: string; size: string; amount: number }>>;
+    };
+  }
+}
 
 interface PopupProps {
   popupType: "imageUpload" | "exportImport" | "removeImage" | "gridPreset";
@@ -22,209 +30,97 @@ const POPUP_TITLES = {
 
 const Popup = ({ popupType, onClose }: PopupProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [hoveredBox, setHoveredBox] = React.useState<'export' | 'import' | null>(null);
-
-  const handleDivClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      console.log("Selected file:", file.name);
-    }
-  };
-
-  const images = Array(3).fill("praline.jpeg");
-
-  const title = POPUP_TITLES[popupType] || "Popup";
-
+  const [hoveredBox, setHoveredBox] = React.useState<"export" | "import" | null>(null);
 
   const [amount, setAmount] = useState("");
   const [shape, setShape] = useState<"circle" | "rectangle">("circle");
   const [size, setSize] = useState<"small" | "medium" | "large">("medium");
+  const [presets, setPresets] = useState<
+    Array<{ id: number; shape: string; size: string; amount: number }>
+  >([]);
 
-  // Helper functions to handle type conversions for InputField
+  // Helper functions
   const handleShapeChange = (value: string) => {
-    if (value === "circle" || value === "rectangle") {
-      setShape(value);
+    if (value === "circle" || value === "rectangle") setShape(value);
+  };
+  const handleSizeChange = (value: string) => {
+    if (value === "small" || value === "medium" || value === "large") setSize(value);
+  };
+
+  // Fetch existing presets (optioneel)
+  React.useEffect(() => {
+    if (popupType === "gridPreset") {
+      fetchPresets();
+    }
+  }, [popupType]);
+
+  const fetchPresets = async () => {
+    if (window.electronAPI?.getPresets) {
+      const result = await window.electronAPI.getPresets();
+      setPresets(result);
     }
   };
 
-  const handleSizeChange = (value: string) => {
-    if (value === "small" || value === "medium" || value === "large") {
-      setSize(value);
+  const handleSavePreset = async () => {
+    if (!amount || isNaN(parseInt(amount))) {
+      alert("Geef een geldig aantal op.");
+      return;
+    }
+
+    if (window.electronAPI?.addPreset) {
+      await window.electronAPI.addPreset({
+        shape,
+        size,
+        amount: parseInt(amount),
+      });
+      alert("Preset opgeslagen!");
+      await fetchPresets();
+      if (onClose) onClose();
+    } else {
+      alert("Electron API niet beschikbaar.");
     }
   };
+
+  const title = POPUP_TITLES[popupType] || "Popup";
 
   return (
-    <div className="p-4 bg-[var(--color-popup)] rounded-2xl shadow relative w-[50%]">
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileChange}
-        style={{ display: "none" }}
-      />
+    <div className="p-4 bg-[var(--color-popup)] rounded-2xl shadow relative w-[50%] z-50">
       <button className="absolute top-4 right-3" onClick={onClose}>
-        <XMarkIcon className="h-6 w-6s text-[var(--dark-text)] cursor-pointer" />
+        <XMarkIcon className="h-6 w-6 text-[var(--dark-text)] cursor-pointer" />
       </button>
 
       <div>
         <h2 className="text-xl font-bold text-[var(--color-primary)] mb-4">{title}</h2>
         <hr className="w-full mb-4 border-1 rounded-2xl border-gray-400" />
 
-        {popupType === "imageUpload" && (
-          <>
-            <div
-              onClick={handleDivClick}
-              className="w-full h-60 mx-6 p-6 bg-[var(--color-white)] text-[var(--color-text)] rounded-2xl shadow cursor-pointer flex flex-col justify-center items-center"
-            >
-              <CloudArrowUpIcon className="h-15 w-15 text-[var(--color-primary)]" />
-              <p className="text-[var(--color-text)] text-lg">Upload een bestand of sleep</p>
-              <p className="text-gray-400">PNG, JPG, GIF tot 5MB</p>
-            </div>
-
-            <p className="my-3 text-xl text-[var(--color-text)]">Of kies uit eerdere foto&apos;s</p>
-            <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mb-6">
-              {images.map((src, idx) => (
-                <img
-                  key={idx}
-                  src={src}
-                  alt={`doosje praline ${idx + 1}`}
-                  className="w-full h-40 object-cover rounded-2xl shadow"
-                />
-              ))}
-            </div>
-          </>
-        )}
-
         {popupType === "gridPreset" && (
-          <div>
-            <div>
-              <div className="flex flex-row gap-6 mx-auto">
-                <InputField
-                  type="textField"
-                  label="Aantal"
-                  hint="Aantal vormen"
-                  value={amount}
-                  onChange={setAmount}
-                />
-
-                <InputField
-                  type="shapeDropdown"
-                  label="Vorm"
-                  value={shape}
-                  onChange={handleShapeChange}
-                />
-
-                <InputField
-                  type="sizeDropdown"
-                  label="Grootte"
-                  value={size}
-                  onChange={handleSizeChange}
-                />
-              </div>
-
+          <>
+            <div className="flex flex-row gap-6 mx-auto">
+              <InputField type="textField" label="Aantal" hint="Aantal vormen" value={amount} onChange={setAmount} />
+              <InputField type="shapeDropdown" label="Vorm" value={shape} onChange={handleShapeChange} />
+              <InputField type="sizeDropdown" label="Grootte" value={size} onChange={handleSizeChange} />
             </div>
+
             <div className="mx-auto">
               <div className="my-2 flex flex-row gap-6 max-w-5xl mx-auto">
                 <p className="text-sm font-bold text-[var(--color-primary)]">Voorbeeld:</p>
               </div>
-              <div className="w-full h-65 border border-gray-300 rounded-lg bg-white flex items-center justify-center">
+              <div className="w-full h-80 border border-gray-300 rounded-lg bg-white flex items-center justify-center">
                 <GridPreset shape={shape} size={size} scale={0.3} total={parseInt(amount)} />
               </div>
             </div>
-
-          </div>
-
-
+          </>
         )}
 
-        {popupType === "exportImport" && (
-          <div className="w-full flex justify-center">
-            <div
-              className="w-[95%] h-[25vw] m-2 flex justify-center items-center rounded-2xl shadow cursor-pointer transition-colors duration-200"
-              style={{ backgroundColor: hoveredBox === 'import' ? 'var(--hover-white)' : 'var(--color-white)' }}
-              onMouseEnter={() => setHoveredBox('import')}
-              onMouseLeave={() => setHoveredBox(null)}
-            >
-              <div className="flex-col justify-center text-center">
-                <ArrowDownOnSquareIcon className="h-30 w-30 text-[var(--color-primary)]"/>
-                <p className="mt-4 text-4xl font-semibold">Import</p>
-              </div>
-            </div>
-            <div
-              className="w-[95%] h-[25vw] m-2 flex justify-center items-center rounded-2xl shadow cursor-pointer transition-colors duration-200"
-              style={{ backgroundColor: hoveredBox === 'export' ? 'var(--hover-white)' : 'var(--color-white)' }}
-              onMouseEnter={() => setHoveredBox('export')}
-              onMouseLeave={() => setHoveredBox(null)}
-            >
-              <div className="flex-col justify-center text-center">
-                <ArrowUpOnSquareIcon className="h-30 w-30 text-[var(--color-primary)]"/>
-                <p className="mt-4 text-4xl font-semibold">Export</p>
-              </div>
-            </div>
+        <div className="w-full mt-4 flex justify-between items-center gap-4">
+          <div className="w-[282px]">
+            <Button type="secondary" text="Annuleren" onClick={onClose} />
           </div>
-        )}
-
-        {popupType === "removeImage" && (
-          <div className="flex-col">
-            <div className="flex justify-center">
-              <img
-                src="praline.jpeg"
-                alt="doosje praline"
-                className="w-70 h-70 object-cover rounded-2xl shadow"
-              />
-            </div>
-            <p className="mt-8 mb-8 text-3xl">
-              Ben je zeker dat je dit wilt verwijderen?
-            </p>
-
-          </div>
-        )}
-
-        <div className="w-full mt-4">
-          {popupType === "removeImage" && (
-            <div className="flex justify-between items-center">
-              <div className="w-[282px]">
-                <Button type="secondary" text="Terug" onClick={onClose} />
-              </div>
-              <div className="w-[282px]">
-                <Button type="primary" text="Verwijderen" />
-              </div>
-            </div>
-          )}
-
-          {popupType === "exportImport" && (
-            <div className="flex justify-center">
-              <div className="w-[282px]">
-                <Button type="secondary" text="Terug" onClick={onClose} />
-              </div>
-            </div>
-          )}
-
-          {popupType === "imageUpload" && (
-            <div className="flex justify-between items-center">
-              <div className="w-[282px]">
-                <Button type="secondary" text="Annuleren" onClick={onClose} />
-              </div>
-              <div className="w-[282px]">
-                <Button type="primary" text="Opslaan" />
-              </div>
-            </div>
-          )}
-
           {popupType === "gridPreset" && (
-            <div className="flex justify-between items-center gap-4">
-              <div className="w-[282px]">
-                <Button type="secondary" text="Annuleren" />
-              </div>
-              <div className="w-[282px]">
-                <Button type="primary" text="Opslaan" />
-              </div>
+            <div className="w-[282px]">
+              <Button type="primary" text="Opslaan" onClick={handleSavePreset} />
             </div>
           )}
-
         </div>
       </div>
     </div>
