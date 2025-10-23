@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -6,7 +6,11 @@ export const metadata: Metadata = {
   description: "A professional tool for managing and projecting work areas with customizable grids and shapes",
   keywords: ["MPI", "projection", "grid", "shapes", "work area"],
   authors: [{ name: " Digital Innovation student of Thomas More Geel" }],
-  viewport: "width=device-width, initial-scale=1",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
