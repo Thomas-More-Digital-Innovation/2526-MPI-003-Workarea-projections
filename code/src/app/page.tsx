@@ -14,7 +14,7 @@ export default function Home() {
   }
   
   return (
-    <div className="min-h-screen bg-[var(--color-secondary)]/20">
+    <div className="min-h-screen bg-[var(--color-secondary)]/20 pb-24">
       {/* Navbar bovenaan */}
       <Navbar />
 
@@ -27,7 +27,17 @@ export default function Home() {
             
         <Button text="Grid toevoegen (tijdelijke link)" onClick={() => setShowPopup(true)} />
       </main>
-      {showPopup && <Popup popupType="gridPreset" />}
+
+      {/* Popup overlay */}
+      {showPopup && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/80 z-50">
+          <Popup popupType="gridPreset" onClose={() => setShowPopup(false)} />
+        </div>
+      )}
+
+      {/* Footer onderaan */}
+      <Footer
+      />
     </div>
   );
 }
