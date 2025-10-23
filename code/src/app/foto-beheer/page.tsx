@@ -1,18 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
-
-declare global {
-  interface Window {
-    electronAPI?: {
-      addImage: (file: { name: string; buffer: Uint8Array }, description: string) => Promise<unknown>;
-      getImages: () => Promise<unknown>;
-      deleteImage: (imageId: number) => Promise<unknown>;
-    };
-  }
-}
 import { Plus, Upload, X } from 'lucide-react';
+import { Button } from '@/components';
 
 export default function FotosBeheren() {
   const [images, setImages] = useState<Array<{ imageId: number; path: string; description: string }>>([]);
@@ -57,10 +47,9 @@ export default function FotosBeheren() {
       name: selectedFile.name,
       buffer: new Uint8Array(arrayBuffer),
     };
-    const description = 'Geüploade afbeelding'; // Hardcoded description
+    const description = 'Geüploade afbeelding';
     if (window.electronAPI && window.electronAPI.addImage) {
       await window.electronAPI.addImage(fileData, description);
-      alert('Afbeelding opgeslagen in database!');
     } else {
       alert('Electron API niet beschikbaar.');
     }
@@ -71,11 +60,7 @@ export default function FotosBeheren() {
     setPreviewUrl(null);
     setSelectedFile(null);
     setShowUploadModal(false);
-  };
-
-  const handleUploadFromOnline = () => {
-    console.log('Upload van internet');
-    setShowUploadModal(false);
+    fetchImages();
   };
 
   const handleTerug = () => {
@@ -88,142 +73,123 @@ export default function FotosBeheren() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-blue-100 to-cyan-100">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-teal-500 to-cyan-500 px-6 py-4 shadow">
-        <h1 className="text-xl font-semibold text-white">Foto&apos;s Beheren 2</h1>
+    <div className="flex flex-col min-h-screen bg-[var(--color-secondary)]/20">
+      {/* Header - centered card */}
+      <div className="px-4 py-4">
+        <div className="mx-auto max-w rounded-lg shadow-sm" style={{ backgroundColor: 'var(--color-white)', padding: '0.75rem' }}>
+          <h1 className="text-center text-4xl px-6 py-3 font-semibold text-[var(--dark-text)]">Foto&apos;s Beheren</h1>
+        </div>
       </div>
 
-      {/* Content Area */}
-      <div className="flex-1 p-6 overflow-auto">
-  <div className="grid grid-cols-6 grid-rows-3 gap-3 justify-center items-center">
-          {/* Add Button */}
-          <button
-            onClick={handleAddImage}
-            className="w-56 h-56 border-2 border-dashed border-teal-400 rounded-lg flex items-center justify-center hover:border-teal-500 hover:bg-white/60 transition-colors bg-white/40"
-          >
-            <Plus className="w-16 h-16 text-teal-600" />
-          </button>
+      {/* Content area - over volle breedte met padding aan zijkanten */}
+      <div className="flex-1 px-4">
+  <div className="rounded-xl p-6 min-h-[38.7vw] overflow-y-auto shadow-sm" style={{ backgroundColor: 'var(--color-white)' }}>
+          <div className="grid grid-cols-8 gap-4 w-full scrollable">
+            {/* Add Button as first grid cell */}
+            <div className="w-full aspect-square rounded-lg border border-dashed flex items-center justify-center hover:bg-white/60 transition-all bg-[var(--color-white)]">
+              <button
+                onClick={handleAddImage}
+                aria-label="Voeg afbeelding toe"
+                className="w-full h-full flex items-center justify-center"
+              >
+                <Plus className="w-12 h-12 text-[var(--color-primary)]" strokeWidth={1} />
+              </button>
+            </div>
 
-          {/* Image Previews from DB */}
-          {images.length > 0
-            ? images.map((img) => (
-                <div
-                  key={img.imageId}
-                  className="w-56 h-56 rounded-lg overflow-hidden border border-gray-200 hover:border-gray-300 transition-colors cursor-pointer flex items-center justify-center bg-white"
-                  onClick={() => {
-                    setImageToDelete(img);
-                    setShowDeleteModal(true);
-                  }}
-                >
-                  <Image
-                    src={`/${img.path}`}
-                    alt={img.description || 'Preview'}
-                    width={224}
-                    height={224}
-                    className="w-full h-full object-cover"
-                    unoptimized
-                  />
-                </div>
-              ))
-            : <div className="col-span-6 row-span-3 flex items-center justify-center min-w-full">
-                <div className="text-center">
-                  <Upload className="w-16 h-16 text-teal-400 mx-auto mb-4" />
-                  <p className="text-gray-600 text-lg font-medium mb-2">
-                    Nog geen foto&apos;s toegevoegd
-                  </p>
-                  <p className="text-gray-400 text-sm">
-                    Klik op de + knop om foto&apos;s toe te voegen
-                  </p>
-                </div>
+            {/* Image Previews from DB (limit to 18 = 6x3) */}
+            {images.map((img) => (
+              <div
+                key={img.imageId}
+                className="w-full aspect-square rounded-lg overflow-hidden shadow-lg bg-[var(--color-white)] cursor-pointer"
+                onClick={() => {
+                  setImageToDelete(img);
+                  setShowDeleteModal(true);
+                }}
+              >
+                <img
+                  src={`/${img.path}`}
+                  alt={img.description || 'Preview'}
+                  className="w-full h-full object-contain object-center"
+                />
               </div>
-          }
-      {/* Delete Modal (outside grid) */}
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Footer Buttons - over volle breedte */}
+      <div className="px-4 py-4">
+        <div className="w-full rounded-2xl shadow-md" style={{ backgroundColor: 'var(--color-white)' }}>
+          <div className="px-3 py-3">
+        <div className="flex justify-start">
+        <Button text="Terug" type="primary" onClick={handleTerug} fullWidth={true} fixedWidth={true} />
+      </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Delete Modal */}
       {showDeleteModal && imageToDelete && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm relative">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-20 p-2">
+          <div className="rounded-2xl shadow-2xl w-full max-w-md relative overflow-hidden" style={{ backgroundColor: 'var(--color-white)' }}>
             {/* Close Button */}
             <button
               onClick={() => {
                 setShowDeleteModal(false);
                 setImageToDelete(null);
               }}
-              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors"
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors z-10"
             >
-              <X className="w-5 h-5" />
+              <X className="w-6 h-6" />
             </button>
 
             {/* Header */}
-            <div className="bg-gradient-to-r from-teal-500 to-cyan-500 rounded-t-2xl px-6 py-4">
-              <h2 className="text-lg font-semibold text-white text-center">Afbeelding verwijderen</h2>
-            </div>
-
-            {/* Content */}
-            <div className="p-6">
-              <div className="flex justify-center mb-4">
-                <Image
-                  src={`/${imageToDelete.path}`}
-                  alt={imageToDelete.description || 'Preview'}
-                  width={224}
-                  height={224}
-                  className="rounded-lg shadow"
-                  unoptimized
-                />
+            <div style={{ background: 'var(--color-popup)' }} className="px-6 py-4">
+              <div className='pb-3'>
+                <h2 className="text-xl font-semibold text-[var(--dark-text)] text-center">Afbeelding verwijderen</h2>
               </div>
-              <p className="text-center text-gray-700 font-medium mb-6">
-                Weet je zeker dat je deze afbeelding wilt verwijderen?
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowDeleteModal(false);
-                    setImageToDelete(null);
-                  }}
-                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition-colors font-medium shadow"
-                >
-                  Annuleren
-                </button>
-                <button
-                  onClick={async () => {
-                    if (window.electronAPI && window.electronAPI.deleteImage) {
-                      await window.electronAPI.deleteImage(imageToDelete.imageId);
-                      setShowDeleteModal(false);
-                      setImageToDelete(null);
-                      fetchImages();
-                    }
-                  }}
-                  className="flex-1 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors font-medium shadow"
-                >
-                  Verwijderen
-                </button>
+
+              <div className='border border-gray-400'></div>
+
+              {/* Content */}
+              <div className="pt-12">
+                <div className="flex justify-center mb-6">
+                    <div className="w-40 sm:w-48 md:w-56 aspect-square rounded-lg overflow-hidden shadow-md bg-[var(--color-white)]">
+                      <img
+                        src={`/${imageToDelete.path}`}
+                        alt={imageToDelete.description || 'Preview'}
+                        className="w-full h-full object-contain object-center"
+                      />
+                    </div>
+                  </div>
+                <p className="text-center text-xl text-gray-700 mb-6">
+                  Weet je zeker dat je deze afbeelding wilt verwijderen?
+                </p>
+                <div className="flex w-full pt-6">
+                    <div style={{paddingRight: '0.25rem', borderRadius: '0.75rem' }} className="flex-1">
+                    <Button text="Terug" type="secondary" onClick={() => { setShowDeleteModal(false); setImageToDelete(null); }} />
+                  </div>
+                  <div style={{paddingLeft: '0.25rem', borderRadius: '0.75rem' }} className="flex-1">
+                    <Button text="Verwijderen" type="primary" onClick={async () => {
+                      if (window.electronAPI && window.electronAPI.deleteImage) {
+                        await window.electronAPI.deleteImage(imageToDelete.imageId);
+                        setShowDeleteModal(false);
+                        setImageToDelete(null);
+                        fetchImages();
+                      }
+                    }} />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
-    )}
-        </div>
-      </div>
+      )}
 
-      {/* Footer Buttons */}
-      <div className="bg-white border-t border-gray-200 px-6 py-4 flex justify-between shadow">
-        <button
-          onClick={handleTerug}
-          className="px-8 py-2 bg-teal-500 text-white rounded hover:bg-teal-600 transition-colors font-medium shadow"
-        >
-          Terug
-        </button>
-        <button
-          onClick={handleOpslaan}
-          className="px-8 py-2 bg-teal-500 text-white rounded hover:bg-teal-600 transition-colors font-medium shadow"
-        >
-          Opslaan
-        </button>
-      </div>
-
-      {/* Upload Modal */}
+      {/* Upload Modal - same layout as Delete Modal */}
       {showUploadModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm relative">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="rounded-2xl shadow-2xl w-full max-w-md relative overflow-hidden" style={{ backgroundColor: 'var(--color-white)' }}>
             {/* Close Button */}
             <button
               onClick={() => {
@@ -234,67 +200,51 @@ export default function FotosBeheren() {
                 setSelectedFile(null);
                 setShowUploadModal(false);
               }}
-              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors"
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors z-10"
             >
-              <X className="w-5 h-5" />
+              <X className="w-6 h-6" />
             </button>
 
             {/* Header */}
-            <div className="bg-gradient-to-r from-teal-500 to-cyan-500 rounded-t-2xl px-6 py-4">
-              <h2 className="text-lg font-semibold text-white text-center">Foto Toevoegen 2</h2>
-            </div>
+            <div style={{ background: 'var(--color-popup)' }} className="px-6 py-4">
+              <div className='pb-3'>
+                <h2 className="text-xl font-semibold text-[var(--dark-text)] text-center">Foto Toevoegen</h2>
+              </div>
 
-            {/* Content */}
-            <div className="p-6">
-              {/* Upload Icon */}
-              <div className="flex justify-center mb-4">
-                <div className="w-16 h-16 bg-gradient-to-br from-teal-200 to-cyan-200 rounded-full flex items-center justify-center">
-                  <Upload className="w-8 h-8 text-teal-600" />
+              <div className='border border-gray-400'></div>
+
+              {/* Content */}
+              <div className="pt-12">
+                <div className="flex justify-center mb-6">
+                  {previewUrl ? (
+                    <div className="w-40 sm:w-48 md:w-56 aspect-square rounded-lg overflow-hidden shadow-md bg-[var(--color-white)]">
+                      <img
+                        src={previewUrl}
+                        alt="Preview"
+                        className="w-full h-full object-contain object-center"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex gap-3">
+                      <div className="w-20 h-20 rounded-lg bg-gray-200 shadow"></div>
+                      <div className="w-20 h-20 rounded-lg bg-gray-200 shadow"></div>
+                      <div className="w-20 h-20 rounded-lg bg-gray-200 shadow"></div>
+                    </div>
+                  )}
                 </div>
-              </div>
 
+                <p className="text-center text-xl text-gray-700 mb-6">
+                  klik op opslaan om de afbeelding toe te voegen.
+                </p>
 
-              {/* Images Preview */}
-              <div className="flex justify-center gap-3 mb-6">
-                {previewUrl ? (
-                  <Image 
-                    src={previewUrl} 
-                    alt="Preview" 
-                    width={256}
-                    height={192}
-                    className="w-full h-48 object-cover rounded-lg shadow"
-                    unoptimized
-                  />
-                ) : (
-                  <>
-                    <div className="w-16 h-16 rounded-lg bg-gray-300 shadow"></div>
-                    <div className="w-16 h-16 rounded-lg bg-gray-300 shadow"></div>
-                    <div className="w-16 h-16 rounded-lg bg-gray-300 shadow"></div>
-                  </>
-                )}
-              </div>
-
-              {/* Buttons */}
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    if (previewUrl !== null) {
-                      URL.revokeObjectURL(previewUrl);
-                    }
-                    setPreviewUrl(null);
-                    setSelectedFile(null);
-                    setShowUploadModal(false);
-                  }}
-                  className="flex-1 px-4 py-2 bg-teal-500 text-white rounded hover:bg-teal-600 transition-colors font-medium shadow"
-                >
-                  Terug
-                </button>
-                <button
-                  onClick={handleUploadFromLocal}
-                  className="flex-1 px-4 py-2 bg-teal-500 text-white rounded hover:bg-teal-600 transition-colors font-medium shadow"
-                >
-                  Opslaan
-                </button>
+                <div className="flex w-full pt-6">
+                  <div style={{padding: '0.25rem', borderRadius: '0.75rem' }} className="flex-1">
+                    <Button text="Terug" type="secondary" onClick={() => { if (previewUrl !== null) { URL.revokeObjectURL(previewUrl); } setPreviewUrl(null); setSelectedFile(null); setShowUploadModal(false); }} />
+                  </div>
+                  <div style={{padding: '0.25rem', borderRadius: '0.75rem' }} className="flex-1">
+                    <Button text="Opslaan" type="primary" onClick={handleUploadFromLocal} />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
