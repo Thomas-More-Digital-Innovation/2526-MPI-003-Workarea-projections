@@ -1,7 +1,10 @@
 "use client";
+"use client";
 
 import React, { useState, useEffect } from "react";
 import { Navbar, Button, Popup, GridCard, Footer } from "@/components";
+import { Link } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface CardData {
   id: number;
@@ -13,6 +16,7 @@ export default function Home() {
   const [showPopup, setShowPopup] = useState(false);
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
   const [presets, setPresets] = useState<any[]>([]);
+  const router = useRouter();
 
   const handleSelect = (id: string | number) => {
     const num = Number(id);
@@ -34,6 +38,10 @@ export default function Home() {
 
     loadPresets();
   }, []);
+    
+    function handleCalibration() {
+    router.push("/calibration");
+  }
 
   return (
     <div className="min-h-screen bg-[var(--color-secondary)]/20">
@@ -42,12 +50,9 @@ export default function Home() {
 
       {/* Content van de pagina */}
       <main className="p-6">
-        <Button
-          text="Grid toevoegen (tijdelijke link)"
-          onClick={() => setShowPopup(true)}
-        />
-
-        <div className="mt-4">
+        <h1 className="text-2xl font-bold">Welkom bij MPI Projectie Tool</h1>
+        <p className="mt-4">Kies een van de onderstaande opties om te beginnen:</p>
+          <div className="mt-4">
           <Button
             text={selectedCard ? "Actie op geselecteerde preset" : "Selecteer een preset om actie te doen"}
             onClick={() => {
@@ -82,6 +87,10 @@ export default function Home() {
             </div>
           )}
         </div>
+        
+        <Button onClick={handleCalibration} text="Start Calibratie & Projectie Deze knop fixen!!!!!!!" />
+            
+        <Button text="Grid toevoegen (tijdelijke link)" onClick={() => setShowPopup(true)} />
       </main>
 
       {/* Popup overlay */}
