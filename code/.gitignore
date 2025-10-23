@@ -40,6 +40,3 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-C:\school\DI\2526-MPI-003-Workarea-projections\code\data\app.db
-
-.gitignore
