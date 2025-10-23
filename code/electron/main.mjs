@@ -65,16 +65,6 @@ if (db.prepare('SELECT COUNT(*) AS count FROM Preset').get().count === 0) {
     .run(24, 1);
 }
 
-if (db.prepare('SELECT COUNT(*) AS count FROM Image').get().count === 0) {
-  db.prepare('INSERT INTO Image (path, description) VALUES (?, ?)')
-    .run('images/example.jpg', 'Voorbeeld afbeelding');
-}
-
-if (db.prepare('SELECT COUNT(*) AS count FROM Step').get().count === 0) {
-  db.prepare('INSERT INTO Step (taskId, presetId, imageId, step, description) VALUES (?, ?, ?, ?, ?)')
-    .run(1, 1, 1, 1, 'Eerste stap van voorbeeld');
-}
-
 // Voorbeeld uitlezen van data
 
 // IPC handlers voor Image CRUD
@@ -89,7 +79,50 @@ ipcMain.handle('images:add', (event, { path, description }) => {
 });
 
 ipcMain.handle('images:delete', (event, imageId) => {
-  db.prepare('DELETE FROM Image WHERE imageId = ?').run(imageId);
+  // Find image row first
+  const img = db.prepare('SELECT * FROM Image WHERE imageId = ?').get(imageId);
+  if (!img) {
+    return { success: false, error: 'Image not found' };
+  }
+
+  // Remove any Steps that reference this image to avoid foreign key constraint errors
+  try {
+    db.prepare('DELETE FROM Step WHERE imageId = ?').run(imageId);
+  } catch (err) {
+    console.error('Failed to delete referencing Steps for image', imageId, err);
+    // proceed — we'll still attempt to delete the image row
+  }
+
+  // Delete the image row from the database
+  try {
+    db.prepare('DELETE FROM Image WHERE imageId = ?').run(imageId);
+  } catch (err) {
+    console.error('Failed to delete Image row', imageId, err);
+    return { success: false, error: 'Failed to delete image row' };
+  }
+
+  // Attempt to delete the physical file from the public directory
+  try {
+    // img.path is stored like 'images/filename.ext'
+    const resolved = path.resolve(__dirname, '..', img.path);
+    const publicDir = path.resolve(__dirname, '..', 'public');
+    // Safety: ensure the file lies inside the public directory
+    if (resolved.startsWith(publicDir)) {
+      if (fs.existsSync(resolved)) {
+        fs.unlinkSync(resolved);
+      } else {
+        // file already missing — not a fatal error
+        console.warn('Image file not found when attempting unlink:', resolved);
+      }
+    } else {
+      console.warn('Refusing to delete file outside public dir:', resolved);
+    }
+  } catch (err) {
+    console.error('Failed to remove image file from disk for imageId', imageId, err);
+    // not fatal for DB state — return success but include warning
+    return { success: true, warning: 'File delete failed' };
+  }
+
   return { success: true };
 });
 

@@ -1,4 +1,5 @@
 "use client";
+"use client";
 
 import { Navbar, Button, Popup } from "@/components";
 import { useState } from "react";
