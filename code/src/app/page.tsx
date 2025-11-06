@@ -1,6 +1,6 @@
 "use client";
 
-import { Navbar, Button, Popup } from "@/components";
+import { Navbar, Button, Popup, Footer } from "@/components";
 import { Link } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState} from "react";

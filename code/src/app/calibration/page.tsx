@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, GridPreset } from '@/components';
+import { useRouter } from "next/navigation";
 import { useState, useRef, useEffect, useCallback } from 'react';
 
 interface Point {
@@ -13,6 +14,8 @@ interface CalibrationData {
   points: Point[];
   aspectRatio: number;
 }
+
+
 
 export default function CalibrationPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -27,6 +30,11 @@ export default function CalibrationPage() {
   const [draggingPoint, setDraggingPoint] = useState<string | null>(null);
   const [isCalibrated, setIsCalibrated] = useState(false);
   const [calibrationData, setCalibrationData] = useState<CalibrationData | null>(null);
+  const router = useRouter();
+
+  function handleBack() {
+    router.push("/");
+  }
 
   // Initialize webcam
   const startWebcam = useCallback(async () => {
@@ -258,6 +266,18 @@ export default function CalibrationPage() {
       await startWebcam();
     };
     autoStart();
+
+    // Cleanup: Stop camera when component unmounts
+    return () => {
+      if (videoRef.current?.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach(track => {
+          track.stop();
+        });
+        videoRef.current.srcObject = null;
+      }
+      setIsWebcamActive(false);
+    };
   }, [startWebcam]);
 
   // Reset calibration
@@ -361,12 +381,22 @@ export default function CalibrationPage() {
         </div>
       </div>
 
-      <div className={`bg-white shadow-md border-1 border-gray-200 flex justify-between gap-4 px-3 py-3 m-2 relative rounded-2xl`}>
-        <Button onClick={saveCalibration} text="Terug" /> 
-        <Button onClick={saveCalibration} text="Save Calibration" />
-        <Button onClick={resetCalibration}  text="Reset Calibration" />
-        <Button onClick={saveCalibration} text="Start Projectie" />
-        
+      <div className="bg-white shadow-md border border-gray-200 grid grid-cols-2 gap-4 px-3 py-3 m-2 relative rounded-2xl">
+        {/* Left 50% */}
+        <div className="flex justify-between items-center">
+          <Button onClick={handleBack} text="Terug" />
+          <Button onClick={resetCalibration} type='secondary' text="Reset Calibration" />
+          <Button onClick={saveCalibration} text="Save Calibration" />
+          
+        </div>
+
+        {/* Right 50% */}
+        <div className="flex justify-end items-center">
+          {isCalibrated && (
+            <Button onClick={() => router.push('/projection')} text="Start Projectie" />
+          )}
+        </div>
+
       </div>
     </div>
   );
