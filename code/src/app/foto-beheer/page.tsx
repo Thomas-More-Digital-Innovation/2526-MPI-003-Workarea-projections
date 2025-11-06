@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Plus, Upload, X } from 'lucide-react';
-import { Button } from '@/components';
+import { Button, Footer } from '@/components';
 
 export default function FotosBeheren() {
   const [images, setImages] = useState<Array<{ imageId: number; path: string; description: string }>>([]);
@@ -76,17 +76,17 @@ export default function FotosBeheren() {
     <div className="flex flex-col min-h-screen bg-[var(--color-secondary)]/20">
       {/* Header - centered card */}
       <div className="px-4 py-4">
-        <div className="mx-auto max-w rounded-lg shadow-sm" style={{ backgroundColor: 'var(--color-white)', padding: '0.75rem' }}>
+        <div className="mx-auto max-w rounded-2xl shadow-md" style={{ backgroundColor: 'var(--color-white)', padding: '0.75rem' }}>
           <h1 className="text-center text-4xl px-6 py-3 font-semibold text-[var(--dark-text)]">Foto&apos;s Beheren</h1>
         </div>
       </div>
 
       {/* Content area - over volle breedte met padding aan zijkanten */}
       <div className="flex-1 px-4">
-  <div className="rounded-xl p-6 min-h-[38.7vw] overflow-y-auto shadow-sm" style={{ backgroundColor: 'var(--color-white)' }}>
+  <div className="rounded-2xl p-6 min-h-[38.7vw] overflow-y-auto shadow-sm" style={{ backgroundColor: 'var(--color-white)' }}>
           <div className="grid grid-cols-8 gap-4 w-full scrollable">
             {/* Add Button as first grid cell */}
-            <div className="w-full aspect-square rounded-lg border border-dashed flex items-center justify-center hover:bg-white/60 transition-all bg-[var(--color-white)]">
+            <div className="w-full aspect-square rounded-2xl border border-dashed flex items-center justify-center hover:bg-white/60 transition-all bg-[var(--color-white)]">
               <button
                 onClick={handleAddImage}
                 aria-label="Voeg afbeelding toe"
@@ -100,7 +100,7 @@ export default function FotosBeheren() {
             {images.map((img) => (
               <div
                 key={img.imageId}
-                className="w-full aspect-square rounded-lg overflow-hidden shadow-lg bg-[var(--color-white)] cursor-pointer"
+                className="w-full aspect-square rounded-2xl overflow-hidden shadow-lg bg-[var(--color-white)] cursor-pointer"
                 onClick={() => {
                   setImageToDelete(img);
                   setShowDeleteModal(true);
@@ -120,11 +120,9 @@ export default function FotosBeheren() {
       {/* Footer Buttons - over volle breedte */}
       <div className="px-4 py-4">
         <div className="w-full rounded-2xl shadow-md" style={{ backgroundColor: 'var(--color-white)' }}>
-          <div className="px-3 py-3">
-        <div className="flex justify-start">
-        <Button text="Terug" type="primary" onClick={handleTerug} fullWidth={true} fixedWidth={true} />
-      </div>
-          </div>
+          <Footer>
+            <Button text="Terug" type="primary" onClick={handleTerug} fullWidth={false} fixedWidth={true} />
+          </Footer>
         </div>
       </div>
 
@@ -154,7 +152,7 @@ export default function FotosBeheren() {
               {/* Content */}
               <div className="pt-12">
                 <div className="flex justify-center mb-6">
-                    <div className="w-40 sm:w-48 md:w-56 aspect-square rounded-lg overflow-hidden shadow-md bg-[var(--color-white)]">
+                    <div className="w-40 sm:w-48 md:w-56 aspect-square rounded-2xl overflow-hidden shadow-md bg-[var(--color-white)]">
                       <img
                         src={`/${imageToDelete.path}`}
                         alt={imageToDelete.description || 'Preview'}

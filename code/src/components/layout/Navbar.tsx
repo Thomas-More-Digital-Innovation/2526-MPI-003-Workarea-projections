@@ -29,7 +29,7 @@ const Navbar: React.FC = () => {
   }
 
   return (
-  <nav className={`bg-white shadow-md px-6 py-3 flex items-center justify-between m-2 relative ${mobileMenuOpen ? 'rounded-t-2xl rounded-b-none' : 'rounded-2xl'}`}> 
+  <nav className={`bg-white shadow-md px-3 py-3 flex items-center justify-between relative ${mobileMenuOpen ? 'rounded-t-2xl rounded-b-none' : 'rounded-2xl'}`}> 
       {/* Links: Titel */}
       <div className="text-4xl font-semibold text-[var(--dark-text)]">
         MPI Projectie Tool
@@ -46,7 +46,7 @@ const Navbar: React.FC = () => {
 
       {/* Rechts: Knop en Dropdown (hidden on mobile) */}
       <div className="hidden md:flex items-center space-x-4 relative">
-        <Button type="primary" text="Toevoegen" />
+        <Button type="primary" onClick={() => router.push('/preset')} text="Toevoegen" />
         <Dropdown>
           <Dropdown.Button>Extra</Dropdown.Button>
           <Dropdown.Menu>
@@ -78,7 +78,7 @@ const Navbar: React.FC = () => {
             className="w-11/12 mb-4 mt-4 px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
           />
           <div className="w-11/12 mb-4">
-            <Button type="primary" text="Toevoegen" />
+            <Button type="primary" onClick={() => router.push('/preset')} text="Toevoegen" />
           </div>
           <Dropdown>
             <Dropdown.Button>Extra</Dropdown.Button>
@@ -92,7 +92,7 @@ const Navbar: React.FC = () => {
 
       {/* Popup overlay (always on top) */}
       {showPopup && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/90 bg-opacity-40 z-50">
+        <div className="fixed inset-0 flex items-center justify-center bg-black/50 bg-opacity-40 z-50">
           <Popup popupType="exportImport" onClose={handleClosePopup} />
         </div>
       )}

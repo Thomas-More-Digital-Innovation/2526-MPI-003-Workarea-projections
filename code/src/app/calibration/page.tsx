@@ -32,10 +32,6 @@ export default function CalibrationPage() {
   const [calibrationData, setCalibrationData] = useState<CalibrationData | null>(null);
   const router = useRouter();
 
-  function handleBack() {
-    router.push("/");
-  }
-
   // Initialize webcam
   const startWebcam = useCallback(async () => {
     try {
@@ -384,7 +380,7 @@ export default function CalibrationPage() {
       <div className="bg-white shadow-md border border-gray-200 grid grid-cols-2 gap-4 px-3 py-3 m-2 relative rounded-2xl">
         {/* Left 50% */}
         <div className="flex justify-between items-center">
-          <Button onClick={handleBack} text="Terug" />
+          <Button onClick={() => router.push('/')} text="Terug" />
           <Button onClick={resetCalibration} type='secondary' text="Reset Calibration" />
           <Button onClick={saveCalibration} text="Save Calibration" />
           
