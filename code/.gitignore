@@ -42,4 +42,4 @@ next-env.d.ts
 
 #images
 /public/images
-/data
+/data/app.db

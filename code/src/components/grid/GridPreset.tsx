@@ -8,6 +8,7 @@ interface GridPresetProps {
   scale?: number;
   total: number;
   perPage?: number;
+  pagination?: boolean; // controls whether pagination UI is visible; defaults to true
 }
 
 const GRID_CONFIG = {
@@ -19,11 +20,11 @@ const GRID_CONFIG = {
   "circle-large": { rows: 1, cols: 4, maxPerPage: 4 },
 } as const;
 
-const GridPreset: React.FC<GridPresetProps> = ({ shape, size, scale = 1, total, perPage = total }) => {
+const GridPreset: React.FC<GridPresetProps> = ({ shape, size, scale = 1, total, perPage = total, pagination = true }) => {
   const gridConfig = GRID_CONFIG;
 
-  const key = `${shape}-${size}` as keyof typeof GRID_CONFIG;
-  const config = gridConfig[key];
+  const key = `${shape}-${size}`;
+  const config = gridConfig[key as keyof typeof GRID_CONFIG];
   const effectivePerPage = Math.min(perPage, config.maxPerPage);
   const totalPages = Math.ceil(total / effectivePerPage);
 
@@ -38,11 +39,13 @@ React.useEffect(() => {
   const endIndex = Math.min(startIndex + effectivePerPage, total);
   const shapesArray = Array.from({ length: total }).slice(startIndex, endIndex);
 
-  const showArrows = totalPages > 1 && scale !== 1;
+  // showArrows controls visibility of pagination UI; internal pagination logic still applies
+  const showArrows = pagination && totalPages > 1 && scale !== 1;
 
   return (
     <div className="relative w-full h-full flex flex-col items-center justify-center">
-      <div className="flex items-center justify-between w-full px-5">
+      {/* Use a full-width row where the center container grows and centers its content */}
+      <div className="flex items-center w-full">
         {/* Linkerpijl of placeholder */}
         {showArrows ? (
           <ArrowLeftCircleIcon
@@ -55,12 +58,10 @@ React.useEffect(() => {
           <div className="w-10 h-10 mx-2" /> // placeholder voor centrering
         )}
 
-        {/* Grid */}
-        <div
-          className={`${!scale ? "h-screen flex items-center justify-center" : ""}`}
-        >
+        {/* Grid: center container grows and centers the grid */}
+        <div className="flex-1 flex items-center justify-center">
           <div
-            className="grid gap-10 justify-center"
+            className="grid gap-1 justify-center"
             style={{
               gridTemplateColumns: `repeat(${config.cols}, auto)`,
               gridTemplateRows: `repeat(${config.rows}, auto)`,
@@ -68,7 +69,7 @@ React.useEffect(() => {
           >
             {shapesArray.map((_, index) => (
               <Shape
-                key={index}
+                key={startIndex + index}
                 shape={shape}
                 size={size}
                 completed={false}
