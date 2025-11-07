@@ -21,17 +21,12 @@ interface Circle {
   radius: number;
 }
 
-// Define 8 circles in a grid pattern (2x4) - outside component to avoid recreating
-const CIRCLES: Circle[] = [
-  { id: 0, x: 160, y: 180, radius: 120 },
-  { id: 1, x: 480, y: 180, radius: 120 },
-  { id: 2, x: 800, y: 180, radius: 120 },
-  { id: 3, x: 1120, y: 180, radius: 120 },
-  { id: 4, x: 160, y: 540, radius: 120 },
-  { id: 5, x: 480, y: 540, radius: 120 },
-  { id: 6, x: 800, y: 540, radius: 120 },
-  { id: 7, x: 1120, y: 540, radius: 120 },
-];
+interface GridLayout {
+  gridLayoutId: number;
+  amount: number;
+  shape: string;
+  size: string;
+}
 
 export default function ProjectionPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -39,8 +34,125 @@ export default function ProjectionPage() {
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const [calibrationData, setCalibrationData] = useState<CalibrationData | null>(null);
   const [isWebcamActive, setIsWebcamActive] = useState(false);
-  const [circleStates, setCircleStates] = useState<boolean[]>(new Array(8).fill(false));
+  const [circles, setCircles] = useState<Circle[]>([]);
+  const [circleStates, setCircleStates] = useState<boolean[]>([]);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [isCountingDown, setIsCountingDown] = useState(false);
+  const [isDone, setIsDone] = useState(false); // New state for "done" status
   const router = useRouter();
+
+  // Load grid layout and generate circles
+  useEffect(() => {
+    const loadGridLayout = async () => {
+      const gridLayoutId = localStorage.getItem('currentGridLayoutId');
+      
+      console.log("📦 Stored gridLayoutId:", gridLayoutId);
+      
+      if (!gridLayoutId) {
+        if (confirm('No grid layout selected. Click OK to return to homepage.')) {
+          router.push('/');
+        }
+        return;
+      }
+
+      try {
+        const api = (globalThis as any)?.electronAPI;
+        
+        console.log("🔍 Available API methods:", Object.keys(api || {}));
+        
+        if (!api?.getGridLayouts) {
+          console.error("❌ getGridLayouts not found on electronAPI");
+          console.log("Available methods:", Object.keys(api || {}));
+          alert(`Cannot load grid layout - API method not available. Available: ${Object.keys(api || {}).join(', ')}`);
+          router.push('/');
+          return;
+        }
+
+        console.log("🔄 Calling getGridLayouts");
+        const allGridLayouts: GridLayout[] = await api.getGridLayouts();
+        
+        console.log("📐 All Grid Layouts received:", allGridLayouts);
+
+        // Find the specific grid layout by ID
+        const gridLayout = allGridLayouts.find(layout => layout.gridLayoutId === Number(gridLayoutId));
+        
+        console.log("📐 Selected Grid Layout:", gridLayout);
+
+        if (!gridLayout) {
+          alert(`Grid layout with ID ${gridLayoutId} not found in database`);
+          router.push('/');
+          return;
+        }
+
+        // Generate circles based on grid layout
+        const generatedCircles = generateCirclesFromLayout(gridLayout);
+        console.log("⭕ Generated circles:", generatedCircles);
+        setCircles(generatedCircles);
+        setCircleStates(new Array(generatedCircles.length).fill(false));
+        
+      } catch (err) {
+        console.error("❌ Failed to load grid layout", err);
+        console.error("Error details:", err);
+        alert(`Error loading grid configuration: ${err}`);
+        router.push('/');
+      }
+    };
+
+    loadGridLayout();
+  }, [router]);
+
+  // Generate circles based on grid layout
+  const generateCirclesFromLayout = (layout: GridLayout): Circle[] => {
+    const { amount, shape, size } = layout;
+    const circles: Circle[] = [];
+    
+    // Canvas dimensions
+    const canvasWidth = 1280;
+    const canvasHeight = 720;
+    
+    // Determine radius based on size
+    let radius = 80; // default
+    if (size === 'small') radius = 60;
+    else if (size === 'medium') radius = 100;
+    else if (size === 'large') radius = 140;
+    
+    // Calculate grid dimensions based on amount and shape
+    let cols = 0;
+    let rows = 0;
+    
+    if (shape === 'square') {
+      cols = Math.ceil(Math.sqrt(amount));
+      rows = Math.ceil(amount / cols);
+    } else if (shape === 'rectangle') {
+      // Prefer wider layouts for rectangles
+      cols = Math.ceil(Math.sqrt(amount * 1.5));
+      rows = Math.ceil(amount / cols);
+    } else {
+      // Default to a reasonable grid
+      cols = Math.min(4, amount);
+      rows = Math.ceil(amount / cols);
+    }
+    
+    // Calculate spacing
+    const horizontalSpacing = canvasWidth / (cols + 1);
+    const verticalSpacing = canvasHeight / (rows + 1);
+    
+    // Generate circle positions
+    let id = 0;
+    for (let row = 0; row < rows && id < amount; row++) {
+      for (let col = 0; col < cols && id < amount; col++) {
+        circles.push({
+          id: id,
+          x: horizontalSpacing * (col + 1),
+          y: verticalSpacing * (row + 1),
+          radius: radius
+        });
+        id++;
+      }
+    }
+    
+    return circles;
+  };
 
   // Load calibration from localStorage
   useEffect(() => {
@@ -134,7 +246,7 @@ export default function ProjectionPage() {
 
   // Detect objects in each circle
   const detectObjectsInCircles = useCallback((imageData: Uint8ClampedArray, width: number, height: number) => {
-    const newCircleStates = CIRCLES.map(circle => {
+    const newCircleStates = circles.map(circle => {
       let totalPixels = 0;
       let darkPixels = 0;
 
@@ -170,7 +282,7 @@ export default function ProjectionPage() {
     });
 
     setCircleStates(newCircleStates);
-  }, []);
+  }, [circles]);
 
   // Apply calibration and detect objects
   const processFrame = useCallback(() => {
@@ -250,14 +362,14 @@ export default function ProjectionPage() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Draw circles
-    CIRCLES.forEach((circle, index) => {
+    circles.forEach((circle, index) => {
       ctx.beginPath();
       ctx.arc(circle.x, circle.y, circle.radius, 0, 2 * Math.PI);
       ctx.strokeStyle = circleStates[index] ? '#00ff00' : '#ff0000';
       ctx.lineWidth = 4;
       ctx.stroke();
     });
-  }, [circleStates]);
+  }, [circles, circleStates]);
 
   // Animation loop
   useEffect(() => {
@@ -269,7 +381,7 @@ export default function ProjectionPage() {
       animationFrameId = requestAnimationFrame(animate);
     };
     
-    if (isWebcamActive && calibrationData) {
+    if (isWebcamActive && calibrationData && circles.length > 0) {
       animate();
     }
     
@@ -278,11 +390,11 @@ export default function ProjectionPage() {
         cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [isWebcamActive, calibrationData, processFrame, drawOverlay]);
+  }, [isWebcamActive, calibrationData, circles, processFrame, drawOverlay]);
 
   // Auto-start webcam
   useEffect(() => {
-    if (calibrationData) {
+    if (calibrationData && circles.length > 0) {
       startWebcam();
     }
 
@@ -294,7 +406,47 @@ export default function ProjectionPage() {
       }
       setIsWebcamActive(false);
     };
-  }, [calibrationData, startWebcam]);
+  }, [calibrationData, circles, startWebcam]);
+
+  // Countdown logic
+  useEffect(() => {
+    const allGreen = circleStates.length > 0 && circleStates.every(state => state === true);
+    const allRed = circleStates.length > 0 && circleStates.every(state => state === false);
+    
+    // If we're in "done" state and all circles are red, reset to ready state
+    if (isDone && allRed) {
+      setIsDone(false);
+      console.log('Reset: Ready for next cycle');
+    }
+    
+    // Only start countdown if not in "done" state
+    if (allGreen && !isCountingDown && !isDone) {
+      // Start countdown
+      setIsCountingDown(true);
+      setCountdown(5);
+    } else if (!allGreen && isCountingDown && !isDone) {
+      // Stop countdown if any circle turns red (only if not done)
+      setIsCountingDown(false);
+      setCountdown(null);
+    }
+  }, [circleStates, isCountingDown, isDone]);
+
+  // Countdown timer
+  useEffect(() => {
+    if (isCountingDown && countdown !== null && countdown > 0) {
+      const timer = setTimeout(() => {
+        setCountdown(countdown - 1);
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    } else if (countdown === 0) {
+      // Countdown finished - set done state
+      console.log('Countdown complete!');
+      setIsCountingDown(false);
+      setCountdown(null);
+      setIsDone(true);
+    }
+  }, [countdown, isCountingDown]);
 
   // ESC key handler to exit to homepage
   useEffect(() => {
@@ -319,7 +471,7 @@ export default function ProjectionPage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center">
+    <div className="min-h-screen bg-white flex items-center justify-center relative">
       {/* Hidden video element */}
       <video
         ref={videoRef}
@@ -342,6 +494,24 @@ export default function ProjectionPage() {
         height={720}
         className="w-full h-full"
       />
+
+      {/* Countdown display */}
+      {countdown !== null && countdown > 0 && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="text-9xl font-bold text-green-500 drop-shadow-[0_0_30px_rgba(0,255,0,0.7)]">
+            {countdown}
+          </div>
+        </div>
+      )}
+
+      {/* Done display */}
+      {isDone && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="text-9xl font-bold text-blue-500 drop-shadow-[0_0_30px_rgba(0,100,255,0.7)]">
+            done
+          </div>
+        </div>
+      )}
     </div>
   );
 }
