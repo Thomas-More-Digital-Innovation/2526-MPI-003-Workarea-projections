@@ -20,7 +20,7 @@ const Button = ({ text, type = "primary", onClick, fullWidth = true, fixedWidth 
   const backgroundColor = disabled ? "#9ca3af" : hoverColor;
     return (
       <button
-        className={`${fixedWidthClass} text-2xl p-4 text-[var(--color-white)] font-bold rounded-2xl transition-colors duration-200 cursor-pointer shadow-2xl flex items-center justify-center`}
+        className={`${fixedWidthClass} text-2xl p-4 text-[var(--color-white)] font-bold rounded-2xl transition-colors duration-200 cursor-pointer shadow-lg flex items-center justify-center`}
         style={{
           backgroundColor,
         }}
@@ -37,7 +37,7 @@ const Button = ({ text, type = "primary", onClick, fullWidth = true, fixedWidth 
   // Secondary button
   return (
     <button
-      className={`border-2 border-[var(--color-primary)] ${fixedWidthClass} p-4 text-2xl text-[var(--color-primary)] font-bold rounded-2xl transition-colors duration-200 cursor-pointer shadow-2xl flex items-center justify-center`}
+      className={`border-2 border-[var(--color-primary)] ${fixedWidthClass} p-4 text-2xl text-[var(--color-primary)] font-bold rounded-2xl transition-colors duration-200 cursor-pointer shadow-lg flex items-center justify-center`}
       style={{
         backgroundColor: isHovered ? "var(--hover-white)" : "var(--color-white)",
       }}

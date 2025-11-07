@@ -28,8 +28,8 @@ export default function Home() {
     const loadPresets = async () => {
       try {
         const api = (globalThis as any)?.electronAPI;
-        if (api?.getPresets) {
-          const result = await api.getPresets();
+        if (api?.getPresetsWithGridLayouts) {
+          const result = await api.getPresetsWithGridLayouts();
           setPresets(result || []);
         }
       } catch (err) {
@@ -45,39 +45,21 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-secondary)]/20">
-      {/* Navbar bovenaan */}
+    <div className="p-4 min-h-screen bg-[var(--color-secondary)]/20 flex flex-col justify-between gap-4">
+
       <Navbar />
 
-      {/* Content van de pagina */}
-      <main className="p-6">
-        <h1 className="text-2xl font-bold">Welkom bij MPI Projectie Tool</h1>
-        <p className="mt-4">Kies een van de onderstaande opties om te beginnen:</p>
-          <div className="mt-4">
-          <Button
-            text={selectedCard ? "Actie op geselecteerde preset" : "Selecteer een preset om actie te doen"}
-            onClick={() => {
-              if (selectedCard != null) {
-                // replace with real action later
-                console.log('Action for selected preset', selectedCard);
-              }
-            }}
-            disabled={selectedCard == null}
-            type="secondary"
-          />
-        </div>
-
-        {/* Dynamische GridCards (from DB) */}
-        <div className="grid grid-cols-6 gap-4 mt-6">
+      <main id="Presets" className="bg-white shadow-md px-3 py-3 flex justify-between rounded-2xl w-full flex-1">
+        <div className="grid grid-cols-6 gap-6">
           {presets.length > 0 ? (
             presets.map((p) => (
               <GridCard
-                key={p.gridLayoutId}
-                id={p.gridLayoutId}
-                title={`Preset ${p.gridLayoutId}`}
-                description={`${p.amount} ${p.shape} ${p.size}`}
-                preset={p}
-                active={selectedCard === p.gridLayoutId}
+                key={p.presetId}
+                id={p.presetId}
+                title={p.name}
+                description={p.description}
+                preset={p.gridLayoutId ? p : undefined}
+                active={selectedCard === p.presetId}
                 onSelect={handleSelect}
               />
             ))
@@ -89,26 +71,14 @@ export default function Home() {
           )}
         </div>
         
-        <Button onClick={handleCalibration} text="Start Calibratie & Projectie Deze knop fixen!!!!!!!" />
-            
-        <Button text="Grid toevoegen (tijdelijke link)" onClick={() => setShowPopup(true)} />
+        {/* <Button onClick={handleCalibration} text="Start Calibratie" />
+        <Button text="Grid toevoegen (tijdelijke link)" onClick={() => setShowPopup(true)} /> */}
       </main>
 
-      {/* Popup overlay */}
-      {showPopup && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/80 z-50">
-          <Popup popupType="gridPreset" onClose={() => setShowPopup(false)} />
-          <button
-            className="absolute top-4 right-4 text-white text-2xl"
-            onClick={() => setShowPopup(false)}
-          >
-            &times;
-          </button>
-        </div>
-      )}
-
-      {/*Footer*/}
-      <Footer></Footer>
+      <Footer>
+        <Button type="secondary"  text={"Bewerken"} onClick={() => {}} fullWidth={false} fixedWidth={true} />
+        <Button type="primary" text={"Start"} onClick={() => {}} fullWidth={false} fixedWidth={true} />
+      </Footer>
     </div>
   );
 }
