@@ -68,6 +68,7 @@ export default function Home() {
         console.log("✅ Using gridLayoutId from preset:", selectedPreset.gridLayoutId);
         localStorage.setItem('currentGridLayoutId', selectedPreset.gridLayoutId.toString());
         localStorage.setItem('currentPresetId', selectedCard.toString());
+        localStorage.setItem('currentStepIndex', '0'); // Reset step index
         router.push("/projection");
         return;
       }
@@ -91,6 +92,7 @@ export default function Home() {
 
         localStorage.setItem('currentGridLayoutId', firstStep.gridLayoutId.toString());
         localStorage.setItem('currentPresetId', selectedCard.toString());
+        localStorage.setItem('currentStepIndex', '0'); // Reset step index to start from beginning
         router.push("/projection");
       } else {
         console.error("❌ getStepsByPresetId not found on electronAPI");

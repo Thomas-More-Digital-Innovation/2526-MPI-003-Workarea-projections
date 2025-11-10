@@ -39,17 +39,17 @@ export default function ProjectionPage() {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isCountingDown, setIsCountingDown] = useState(false);
   const [isDone, setIsDone] = useState(false); // New state for "done" status
+  const [isAllStepsComplete, setIsAllStepsComplete] = useState(false); // New state for completion
   const router = useRouter();
 
-  // Load grid layout and generate circles
+  // Step-by-step workflow: load steps and grid layout
   useEffect(() => {
-    const loadGridLayout = async () => {
-      const gridLayoutId = localStorage.getItem('currentGridLayoutId');
-      
-      console.log("📦 Stored gridLayoutId:", gridLayoutId);
-      
-      if (!gridLayoutId) {
-        if (confirm('No grid layout selected. Click OK to return to homepage.')) {
+    const loadStepAndGridLayout = async () => {
+      const presetId = localStorage.getItem('currentPresetId');
+      let stepIndex = Number(localStorage.getItem('currentStepIndex') || '0');
+
+      if (!presetId) {
+        if (confirm('No preset selected. Click OK to return to homepage.')) {
           router.push('/');
         }
         return;
@@ -57,48 +57,52 @@ export default function ProjectionPage() {
 
       try {
         const api = (globalThis as any)?.electronAPI;
-        
-        console.log("🔍 Available API methods:", Object.keys(api || {}));
-        
+        if (!api?.getStepsByPreset) {
+          alert('Cannot load steps - API method not available');
+          router.push('/');
+          return;
+        }
+        const steps = await api.getStepsByPreset(Number(presetId));
+        if (!steps || steps.length === 0) {
+          alert('No steps found for this preset');
+          router.push('/');
+          return;
+        }
+        if (stepIndex >= steps.length) {
+          alert('All steps completed!');
+          router.push('/');
+          return;
+        }
+        const currentStep = steps[stepIndex];
+        if (!currentStep.gridLayoutId) {
+          alert('Step has no grid layout');
+          router.push('/');
+          return;
+        }
+        localStorage.setItem('currentGridLayoutId', currentStep.gridLayoutId.toString());
+        localStorage.setItem('currentStepIndex', stepIndex.toString());
+        // Load grid layout
         if (!api?.getGridLayouts) {
-          console.error("❌ getGridLayouts not found on electronAPI");
-          console.log("Available methods:", Object.keys(api || {}));
-          alert(`Cannot load grid layout - API method not available. Available: ${Object.keys(api || {}).join(', ')}`);
+          alert('Cannot load grid layout - API method not available');
           router.push('/');
           return;
         }
-
-        console.log("🔄 Calling getGridLayouts");
-        const allGridLayouts: GridLayout[] = await api.getGridLayouts();
-        
-        console.log("📐 All Grid Layouts received:", allGridLayouts);
-
-        // Find the specific grid layout by ID
-        const gridLayout = allGridLayouts.find(layout => layout.gridLayoutId === Number(gridLayoutId));
-        
-        console.log("📐 Selected Grid Layout:", gridLayout);
-
+        const allGridLayouts = await api.getGridLayouts();
+        const gridLayout = allGridLayouts.find((layout: GridLayout) => layout.gridLayoutId === Number(currentStep.gridLayoutId));
         if (!gridLayout) {
-          alert(`Grid layout with ID ${gridLayoutId} not found in database`);
+          alert(`Grid layout with ID ${currentStep.gridLayoutId} not found in database`);
           router.push('/');
           return;
         }
-
-        // Generate circles based on grid layout
         const generatedCircles = generateCirclesFromLayout(gridLayout);
-        console.log("⭕ Generated circles:", generatedCircles);
         setCircles(generatedCircles);
         setCircleStates(new Array(generatedCircles.length).fill(false));
-        
       } catch (err) {
-        console.error("❌ Failed to load grid layout", err);
-        console.error("Error details:", err);
-        alert(`Error loading grid configuration: ${err}`);
+        alert(`Error loading step/grid configuration: ${err}`);
         router.push('/');
       }
     };
-
-    loadGridLayout();
+    loadStepAndGridLayout();
   }, [router]);
 
   // Generate circles based on grid layout
@@ -408,15 +412,58 @@ export default function ProjectionPage() {
     };
   }, [calibrationData, circles, startWebcam]);
 
-  // Countdown logic
+  // Countdown logic and step advancement
   useEffect(() => {
     const allGreen = circleStates.length > 0 && circleStates.every(state => state === true);
     const allRed = circleStates.length > 0 && circleStates.every(state => state === false);
     
-    // If we're in "done" state and all circles are red, reset to ready state
+    // If we're in "done" state and all circles are red, advance to next step
     if (isDone && allRed) {
       setIsDone(false);
-      console.log('Reset: Ready for next cycle');
+      // Advance to next step
+      const checkNextStep = async () => {
+        const presetId = localStorage.getItem('currentPresetId');
+        let stepIndex = Number(localStorage.getItem('currentStepIndex') || '0');
+        stepIndex++;
+        
+        try {
+          const api = (globalThis as any)?.electronAPI;
+          const steps = await api.getStepsByPreset(Number(presetId));
+          
+          if (stepIndex >= steps.length) {
+            // All steps completed - show completion message
+            console.log('🎉 All steps completed! Showing completion message...');
+            
+            // Stop the webcam
+            if (videoRef.current?.srcObject) {
+              const stream = videoRef.current.srcObject as MediaStream;
+              stream.getTracks().forEach(track => track.stop());
+              videoRef.current.srcObject = null;
+            }
+            
+            setIsAllStepsComplete(true);
+            
+            // After 5 seconds, clear storage and go to homepage
+            setTimeout(() => {
+              console.log('⏰ 5 seconds elapsed, returning to homepage...');
+              localStorage.removeItem('currentPresetId');
+              localStorage.removeItem('currentStepIndex');
+              localStorage.removeItem('currentGridLayoutId');
+              router.push('/');
+            }, 5000);
+          } else {
+            // Load next step
+            console.log(`⏭️ Loading step ${stepIndex + 1}...`);
+            localStorage.setItem('currentStepIndex', stepIndex.toString());
+            globalThis.location.reload();
+          }
+        } catch (err) {
+          console.error('Error checking next step:', err);
+          globalThis.location.reload();
+        }
+      };
+      checkNextStep();
+      return;
     }
     
     // Only start countdown if not in "done" state
@@ -429,7 +476,7 @@ export default function ProjectionPage() {
       setIsCountingDown(false);
       setCountdown(null);
     }
-  }, [circleStates, isCountingDown, isDone]);
+  }, [circleStates, isCountingDown, isDone, router]);
 
   // Countdown timer
   useEffect(() => {
@@ -505,10 +552,19 @@ export default function ProjectionPage() {
       )}
 
       {/* Done display */}
-      {isDone && (
+      {isDone && !isAllStepsComplete && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-9xl font-bold text-blue-500 drop-shadow-[0_0_30px_rgba(0,100,255,0.7)]">
             done
+          </div>
+        </div>
+      )}
+
+      {/* All steps complete display */}
+      {isAllStepsComplete && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="text-8xl font-bold text-green-500 drop-shadow-[0_0_30px_rgba(0,255,0,0.7)]">
+            alle stappen zijn klaar
           </div>
         </div>
       )}
