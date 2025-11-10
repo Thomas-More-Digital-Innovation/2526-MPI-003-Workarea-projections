@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Navbar, Button, Popup, GridCard, Footer } from "@/components";
+import { Navbar, Button, Popup, GridCard, Footer, GridPreset } from "@/components";
 import { Link } from "lucide-react";
 import { useRouter } from "next/navigation";
+import preset from "./preset/page";
 
 interface CardData {
   id: number;
@@ -115,7 +116,7 @@ export default function Home() {
         id="Presets"
         className="bg-white shadow-md px-3 py-3 flex justify-between rounded-2xl w-full flex-1"
       >
-        <div className="grid grid-cols-6 gap-6">
+        {/* <div className="grid grid-cols-6 gap-6">
           {presets.length > 0 ? (
             presets.map((p) => (
               <GridCard
@@ -136,11 +137,18 @@ export default function Home() {
               </p>
             </div>
           )}
-        </div>
+        </div> */}
 
-        {/* Uncomment these if needed */}
-        {/* <Button onClick={handleCalibration} text="Start Calibratie" />
-        <Button text="Grid toevoegen (tijdelijke link)" onClick={() => setShowPopup(true)} /> */}
+        {/* Test (tijdelijk): */}
+        <GridPreset
+          shape={"rectangle"}
+          size={"large"}
+          scale={1}
+          total={10}
+          pagination={true}
+        />
+        {/* End test */}
+
       </main>
 
       <Footer>
