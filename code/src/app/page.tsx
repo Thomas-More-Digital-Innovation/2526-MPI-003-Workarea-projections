@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Navbar, Button, Popup, GridCard, Footer, Toast } from "@/components";
 import { Link } from "lucide-react";
 import { useRouter } from "next/navigation";
+import preset from "./preset/page";
 
 interface CardData {
   id: number;

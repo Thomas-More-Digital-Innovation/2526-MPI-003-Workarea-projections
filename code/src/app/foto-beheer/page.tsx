@@ -144,7 +144,7 @@ export default function FotosBeheren() {
             {/* Header */}
             <div style={{ background: 'var(--color-popup)' }} className="px-6 py-4">
               <div className='pb-3'>
-                <h2 className="text-xl font-semibold text-[var(--dark-text)] text-center">Afbeelding verwijderen</h2>
+                <h2 className="text-xl font-semibold text-[var(--dark-text)] text-center">Foto verwijderen</h2>
               </div>
 
               <div className='border border-gray-400'></div>
