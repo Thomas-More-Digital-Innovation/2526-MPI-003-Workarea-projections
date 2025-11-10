@@ -276,7 +276,7 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
                   <div
                     key={`${src}-${idx}`}
                     onClick={() => handleRecentImageSelect(src)}
-                    className="cursor-pointer rounded-2xl overflow-hidden shadow hover:shadow-lg transition-shadow mb-6 mx-3"
+                    className="cursor-pointer rounded-2xl overflow-hidden shadow hover:shadow-lg transition-shadow h-[9vw] w-[9vw] mb-6 mx-3"
                   >
                     <img
                       src={src}
