@@ -44,69 +44,38 @@ export default function Home() {
   }
 
   async function handleStart() {
-    if (selectedCard === null) {
-      alert("Please select a preset first");
+  if (selectedCard === null) {
+    alert("Please select a preset first");
+    return;
+  }
+
+  try {
+    const api = (globalThis as any)?.electronAPI;
+    
+    console.log("🔍 Available API methods:", Object.keys(api || {}));
+    
+    // Try to find the selected preset in our already loaded presets
+    const selectedPreset = presets.find(p => p.presetId === selectedCard);
+    
+    console.log("Selected preset:", selectedPreset);
+    
+    if (!selectedPreset) {
+      alert("Selected preset not found");
       return;
     }
 
-    try {
-      const api = (globalThis as any)?.electronAPI;
-      
-      console.log("🔍 Available API methods:", Object.keys(api || {}));
-      
-      // Try to find the selected preset in our already loaded presets
-      const selectedPreset = presets.find(p => p.presetId === selectedCard);
-      
-      console.log("Selected preset:", selectedPreset);
-      
-      if (!selectedPreset) {
-        alert("Selected preset not found");
-        return;
-      }
+    // Sla presetId en stepIndex altijd op, geen checks op gridLayoutId
+    localStorage.setItem('currentPresetId', selectedCard.toString());
+    localStorage.setItem('currentStepIndex', '0'); // Reset step index
 
-      // Check if we have gridLayoutId directly from the preset
-      if (selectedPreset.gridLayoutId) {
-        console.log("✅ Using gridLayoutId from preset:", selectedPreset.gridLayoutId);
-        localStorage.setItem('currentGridLayoutId', selectedPreset.gridLayoutId.toString());
-        localStorage.setItem('currentPresetId', selectedCard.toString());
-        localStorage.setItem('currentStepIndex', '0'); // Reset step index
-        router.push("/projection");
-        return;
-      }
+    router.push("/projection");
 
-      // If not, try to get steps
-      if (api?.getStepsByPresetId) {
-        const steps = await api.getStepsByPresetId(selectedCard);
-        console.log("Steps for preset:", steps);
-
-        if (!steps || steps.length === 0) {
-          alert("No steps found for this preset");
-          return;
-        }
-
-        const firstStep = steps[0];
-        
-        if (!firstStep.gridLayoutId) {
-          alert("First step has no grid layout");
-          return;
-        }
-
-        localStorage.setItem('currentGridLayoutId', firstStep.gridLayoutId.toString());
-        localStorage.setItem('currentPresetId', selectedCard.toString());
-        localStorage.setItem('currentStepIndex', '0'); // Reset step index to start from beginning
-        router.push("/projection");
-      } else {
-        console.error("❌ getStepsByPresetId not found on electronAPI");
-        console.log("Available methods:", Object.keys(api || {}));
-        alert("Cannot load preset steps - API method not available");
-      }
-      
-    } catch (err) {
-      console.error("❌ Failed to load preset steps", err);
-      console.error("Error details:", err);
-      alert(`Error loading preset configuration: ${err}`);
-    }
+  } catch (err) {
+    console.error("❌ Failed to load preset steps", err);
+    alert(`Error starting preset: ${err}`);
   }
+}
+
 
   return (
     <div className="p-4 min-h-screen bg-[var(--color-secondary)]/20 flex flex-col justify-between gap-4">

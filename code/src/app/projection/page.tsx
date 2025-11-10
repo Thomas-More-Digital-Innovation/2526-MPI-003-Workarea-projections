@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import GridPreset from "@/components/grid/GridPreset"; // pas aan indien ander pad
+import GridPreset from "@/components/grid/GridPreset";
 
 // --- Types -----------------------------------------------------------------
 interface Point {
@@ -12,7 +12,7 @@ interface Point {
 }
 
 interface CalibrationData {
-  points: Point[]; // percentages 0..100
+  points: Point[];
   aspectRatio: number;
 }
 
@@ -30,6 +30,20 @@ interface GridLayout {
   size: "small" | "medium" | "large";
 }
 
+interface ImageData {
+  imageId: number;
+  path: string;
+  description: string;
+}
+
+interface Step {
+  stepId: number;
+  step: number;
+  imageId?: number;
+  gridLayoutId?: number;
+  presetId: number;
+}
+
 // --- Component --------------------------------------------------------------
 export default function ProjectionPage() {
   const router = useRouter();
@@ -44,8 +58,12 @@ export default function ProjectionPage() {
 
   // Grid / detection state
   const [circles, setCircles] = useState<Circle[]>([]);
-  const [circleStates, setCircleStates] = useState<boolean[]>([]); // global states for all circles (absolute index)
+  const [circleStates, setCircleStates] = useState<boolean[]>([]);
   const [gridLayout, setGridLayout] = useState<GridLayout | null>(null);
+
+  // Image state
+  const [currentImage, setCurrentImage] = useState<ImageData | null>(null);
+  const [isImageStep, setIsImageStep] = useState(false);
 
   // Countdown and flow
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -53,9 +71,9 @@ export default function ProjectionPage() {
   const [isDone, setIsDone] = useState(false);
   const [isAllStepsComplete, setIsAllStepsComplete] = useState(false);
 
-  // --- Load steps and grid layout from electronAPI (same logic as before) ---
+  // --- Load steps and determine if grid or image ---
   useEffect(() => {
-    const loadStepAndGridLayout = async () => {
+    const loadStepAndContent = async () => {
       const presetId = localStorage.getItem("currentPresetId");
       let stepIndex = Number(localStorage.getItem("currentStepIndex") || "0");
 
@@ -74,7 +92,7 @@ export default function ProjectionPage() {
           return;
         }
 
-        const steps = await api.getStepsByPreset(Number(presetId));
+        const steps: Step[] = await api.getStepsByPreset(Number(presetId));
         if (!steps || steps.length === 0) {
           alert("No steps found for this preset");
           router.push("/");
@@ -88,78 +106,131 @@ export default function ProjectionPage() {
         }
 
         const currentStep = steps[stepIndex];
-        if (!currentStep.gridLayoutId) {
-          alert("Step has no grid layout");
-          router.push("/");
-          return;
-        }
-
-        localStorage.setItem("currentGridLayoutId", currentStep.gridLayoutId.toString());
         localStorage.setItem("currentStepIndex", stepIndex.toString());
 
-        // Load grid layout
-        if (!api?.getGridLayouts) {
-          alert("Cannot load grid layout - API method not available");
+        // Check if this is an image step or grid step
+        if (currentStep.imageId) {
+          // IMAGE STEP
+          setIsImageStep(true);
+          
+          // Load image data
+          const allImages = await api.getImages();
+          const imageData = allImages.find((img: ImageData) => img.imageId === currentStep.imageId);
+          
+          if (!imageData) {
+            alert(`Image with ID ${currentStep.imageId} not found`);
+            router.push("/");
+            return;
+          }
+
+          setCurrentImage(imageData);
+          
+          // Start 5 second timer for image
+          setTimeout(() => {
+            advanceToNextStep();
+          }, 5000);
+
+        } else if (currentStep.gridLayoutId) {
+          // GRID STEP
+          setIsImageStep(false);
+          localStorage.setItem("currentGridLayoutId", currentStep.gridLayoutId.toString());
+
+          if (!api?.getGridLayouts) {
+            alert("Cannot load grid layout - API method not available");
+            router.push("/");
+            return;
+          }
+
+          const allGridLayouts = await api.getGridLayouts();
+          const gridLayoutFromDb = allGridLayouts.find(
+            (layout: any) => layout.gridLayoutId === Number(currentStep.gridLayoutId)
+          );
+
+          if (!gridLayoutFromDb) {
+            alert(`Grid layout with ID ${currentStep.gridLayoutId} not found in database`);
+            router.push("/");
+            return;
+          }
+
+          const parsedLayout: GridLayout = {
+            gridLayoutId: gridLayoutFromDb.gridLayoutId,
+            amount: Number(gridLayoutFromDb.amount) || 0,
+            shape: (gridLayoutFromDb.shape as GridLayout["shape"]) || "circle",
+            size: (gridLayoutFromDb.size as GridLayout["size"]) || "medium",
+          };
+
+          setGridLayout(parsedLayout);
+
+          const generatedCircles = generateCirclesFromLayout(parsedLayout);
+          setCircles(generatedCircles);
+          setCircleStates(new Array(generatedCircles.length).fill(false));
+        } else {
+          alert("Step has no grid layout or image");
           router.push("/");
           return;
         }
-
-        const allGridLayouts = await api.getGridLayouts();
-        const gridLayoutFromDb = allGridLayouts.find(
-          (layout: any) => layout.gridLayoutId === Number(currentStep.gridLayoutId)
-        );
-
-        if (!gridLayoutFromDb) {
-          alert(`Grid layout with ID ${currentStep.gridLayoutId} not found in database`);
-          router.push("/");
-          return;
-        }
-
-        // Ensure shape/size typing matches expected values
-        const parsedLayout: GridLayout = {
-          gridLayoutId: gridLayoutFromDb.gridLayoutId,
-          amount: Number(gridLayoutFromDb.amount) || 0,
-          shape: (gridLayoutFromDb.shape as GridLayout["shape"]) || "circle",
-          size: (gridLayoutFromDb.size as GridLayout["size"]) || "medium",
-        };
-
-        setGridLayout(parsedLayout);
-
-        // Generate detection regions (positional circles) — keep same algorithm as before
-        const generatedCircles = generateCirclesFromLayout({
-          gridLayoutId: parsedLayout.gridLayoutId,
-          amount: parsedLayout.amount,
-          shape: parsedLayout.shape,
-          size: parsedLayout.size,
-        });
-
-        setCircles(generatedCircles);
-        setCircleStates(new Array(generatedCircles.length).fill(false));
       } catch (err) {
-        alert(`Error loading step/grid configuration: ${err}`);
+        alert(`Error loading step configuration: ${err}`);
         router.push("/");
       }
     };
 
-    loadStepAndGridLayout();
+    loadStepAndContent();
   }, [router]);
 
-  // --- Generate circles based on grid layout (kept from original, returns pixel coords for detection) ---
+  // --- Function to advance to next step ---
+  const advanceToNextStep = async () => {
+    const presetId = localStorage.getItem("currentPresetId");
+    let stepIndex = Number(localStorage.getItem("currentStepIndex") || "0");
+    stepIndex++;
+
+    try {
+      const api = (globalThis as any)?.electronAPI;
+      const steps = await api.getStepsByPreset(Number(presetId));
+
+      if (stepIndex >= steps.length) {
+        console.log("🎉 All steps completed! Showing completion message...");
+
+        // Stop webcam if active
+        if (videoRef.current?.srcObject) {
+          const stream = videoRef.current.srcObject as MediaStream;
+          stream.getTracks().forEach((t) => t.stop());
+          videoRef.current.srcObject = null;
+        }
+
+        setIsAllStepsComplete(true);
+
+        setTimeout(() => {
+          console.log("⏰ 5 seconds elapsed, returning to homepage...");
+          localStorage.removeItem("currentPresetId");
+          localStorage.removeItem("currentStepIndex");
+          localStorage.removeItem("currentGridLayoutId");
+          router.push("/");
+        }, 5000);
+      } else {
+        console.log(`⏭️ Loading step ${stepIndex + 1}...`);
+        localStorage.setItem("currentStepIndex", stepIndex.toString());
+        globalThis.location.reload();
+      }
+    } catch (err) {
+      console.error("Error checking next step:", err);
+      globalThis.location.reload();
+    }
+  };
+
+  // --- Generate circles based on grid layout ---
   const generateCirclesFromLayout = (layout: GridLayout): Circle[] => {
     const { amount, shape, size } = layout;
     const circles: Circle[] = [];
 
-    // Canvas / target projection dimensions (must match processing target)
     const canvasWidth = 1280;
     const canvasHeight = 720;
 
-    // Radius based on size (these are tuned to detection canvas)
     let radius = 80;
     if (size === "small") radius = 60;
     else if (size === "medium") radius = 100;
     else if (size === "large") radius = 140;
 
-    // Determine grid rows/cols similar to old logic
     let cols = 0;
     let rows = 0;
 
@@ -193,8 +264,11 @@ export default function ProjectionPage() {
     return circles;
   };
 
-  // --- Load calibration from localStorage (same as before) ---
+  // --- Load calibration from localStorage ---
   useEffect(() => {
+    // Only load calibration if this is NOT an image step
+    if (isImageStep) return;
+
     const savedCalibration = localStorage.getItem("webcamCalibration");
     if (savedCalibration) {
       try {
@@ -210,9 +284,9 @@ export default function ProjectionPage() {
         router.push("/");
       }
     }
-  }, [router]);
+  }, [router, isImageStep]);
 
-  // --- Start webcam (same logic) ---
+  // --- Start webcam ---
   const startWebcam = useCallback(async () => {
     try {
       if (videoRef.current?.srcObject) {
@@ -250,7 +324,7 @@ export default function ProjectionPage() {
     }
   }, [router]);
 
-  // --- Perspective transform utility (kept) ---
+  // --- Perspective transform utility ---
   function getPerspectiveTransform(src: { x: number; y: number }[], dst: { x: number; y: number }[]) {
     const A: number[][] = [];
     const b: number[] = [];
@@ -288,16 +362,15 @@ export default function ProjectionPage() {
     return x;
   }
 
-  // --- Detection function (kept; uses circles[] coordinates) ---
+  // --- Detection function ---
   const detectObjectsInCircles = useCallback(
     (imageData: Uint8ClampedArray, width: number, height: number) => {
-      // If no circles, nothing to do
       if (circles.length === 0) return;
 
       const newCircleStates = circles.map((circle) => {
         let totalPixels = 0;
         let darkPixels = 0;
-        const step = 5; // sample step
+        const step = 5;
 
         for (let y = Math.max(0, Math.floor(circle.y - circle.radius)); y <= Math.min(height - 1, Math.floor(circle.y + circle.radius)); y += step) {
           for (let x = Math.max(0, Math.floor(circle.x - circle.radius)); x <= Math.min(width - 1, Math.floor(circle.x + circle.radius)); x += step) {
@@ -323,7 +396,7 @@ export default function ProjectionPage() {
     [circles]
   );
 
-  // --- Frame processing (perspective transform + detect) ---
+  // --- Frame processing ---
   const processFrame = useCallback(() => {
     if (!calibrationData || !canvasRef.current || !videoRef.current) return;
 
@@ -339,13 +412,11 @@ export default function ProjectionPage() {
     canvas.width = targetWidth;
     canvas.height = targetHeight;
 
-    // src points (in camera pixels) from calibration (percent -> pixels)
     const srcPoints = calibrationData.points.map((p) => ({
       x: (p.x / 100) * video.videoWidth,
       y: (p.y / 100) * video.videoHeight,
     }));
 
-    // dst points (target rect)
     const dstPoints = [
       { x: 0, y: 0 },
       { x: targetWidth, y: 0 },
@@ -355,7 +426,6 @@ export default function ProjectionPage() {
 
     const H = getPerspectiveTransform(dstPoints, srcPoints);
 
-    // draw video to an offscreen canvas (original camera)
     const srcCanvas = document.createElement("canvas");
     srcCanvas.width = video.videoWidth;
     srcCanvas.height = video.videoHeight;
@@ -387,12 +457,10 @@ export default function ProjectionPage() {
     }
 
     ctx.putImageData(dstImage, 0, 0);
-
-    // Run detection on the transformed image data
     detectObjectsInCircles(dstData, targetWidth, targetHeight);
   }, [calibrationData, detectObjectsInCircles]);
 
-  // --- Animation loop: process frames while webcam active ---
+  // --- Animation loop ---
   useEffect(() => {
     let animationFrameId = 0;
 
@@ -401,18 +469,18 @@ export default function ProjectionPage() {
       animationFrameId = requestAnimationFrame(animate);
     };
 
-    if (isWebcamActive && calibrationData && circles.length > 0) {
+    if (isWebcamActive && calibrationData && circles.length > 0 && !isImageStep) {
       animate();
     }
 
     return () => {
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
     };
-  }, [isWebcamActive, calibrationData, circles, processFrame]);
+  }, [isWebcamActive, calibrationData, circles, processFrame, isImageStep]);
 
-  // --- Auto-start webcam when calibration & circles loaded ---
+  // --- Auto-start webcam when calibration & circles loaded (only for grid steps) ---
   useEffect(() => {
-    if (calibrationData && circles.length > 0) {
+    if (calibrationData && circles.length > 0 && !isImageStep) {
       startWebcam();
     }
 
@@ -424,62 +492,22 @@ export default function ProjectionPage() {
       }
       setIsWebcamActive(false);
     };
-  }, [calibrationData, circles, startWebcam]);
+  }, [calibrationData, circles, startWebcam, isImageStep]);
 
-  // --- Countdown & step advancement (kept original logic) ---
+  // --- Countdown & step advancement for GRID steps ---
   useEffect(() => {
+    // Skip this logic for image steps
+    if (isImageStep) return;
+
     const allGreen = circleStates.length > 0 && circleStates.every((s) => s === true);
     const allRed = circleStates.length > 0 && circleStates.every((s) => s === false);
 
-    // If we moved to done and then all circles become red => advance step
     if (isDone && allRed) {
       setIsDone(false);
-
-      const checkNextStep = async () => {
-        const presetId = localStorage.getItem("currentPresetId");
-        let stepIndex = Number(localStorage.getItem("currentStepIndex") || "0");
-        stepIndex++;
-
-        try {
-          const api = (globalThis as any)?.electronAPI;
-          const steps = await api.getStepsByPreset(Number(presetId));
-
-          if (stepIndex >= steps.length) {
-            // All steps completed
-            console.log("🎉 All steps completed! Showing completion message...");
-
-            // Stop webcam
-            if (videoRef.current?.srcObject) {
-              const stream = videoRef.current.srcObject as MediaStream;
-              stream.getTracks().forEach((t) => t.stop());
-              videoRef.current.srcObject = null;
-            }
-
-            setIsAllStepsComplete(true);
-
-            setTimeout(() => {
-              console.log("⏰ 5 seconds elapsed, returning to homepage...");
-              localStorage.removeItem("currentPresetId");
-              localStorage.removeItem("currentStepIndex");
-              localStorage.removeItem("currentGridLayoutId");
-              router.push("/");
-            }, 5000);
-          } else {
-            console.log(`⏭️ Loading step ${stepIndex + 1}...`);
-            localStorage.setItem("currentStepIndex", stepIndex.toString());
-            globalThis.location.reload();
-          }
-        } catch (err) {
-          console.error("Error checking next step:", err);
-          globalThis.location.reload();
-        }
-      };
-
-      checkNextStep();
+      advanceToNextStep();
       return;
     }
 
-    // Start countdown when all green and not already counting and not done
     if (allGreen && !isCountingDown && !isDone) {
       setIsCountingDown(true);
       setCountdown(5);
@@ -487,7 +515,7 @@ export default function ProjectionPage() {
       setIsCountingDown(false);
       setCountdown(null);
     }
-  }, [circleStates, isCountingDown, isDone, router]);
+  }, [circleStates, isCountingDown, isDone, isImageStep]);
 
   // --- Countdown timer effect ---
   useEffect(() => {
@@ -504,7 +532,7 @@ export default function ProjectionPage() {
     }
   }, [countdown, isCountingDown]);
 
-  // --- ESC handler to exit
+  // --- ESC handler to exit ---
   useEffect(() => {
     const handleKeyDown = (ev: KeyboardEvent) => {
       if (ev.key === "Escape") {
@@ -525,27 +553,33 @@ export default function ProjectionPage() {
   const handleShapeClick = (index: number) => {
     setCircleStates((prev) => {
       const copy = [...prev];
-      // toggle the clicked shape
       copy[index] = !copy[index];
       return copy;
     });
   };
 
   // --- JSX -----------------------------------------------------------------
-  // Note: we intentionally keep the hidden video & processing canvas (needed for detection).
-  // The visible grid UI is provided by GridPreset (which uses Shape components).
-  // We do NOT draw overlay circles anymore — GridPreset handles visuals.
   return (
     <div className="min-h-screen bg-white flex items-center justify-center relative">
       {/* Hidden video (camera source) */}
       <video ref={videoRef} autoPlay muted playsInline className="hidden" />
 
-      {/* Hidden canvas used for processing (perspective transform) */}
+      {/* Hidden canvas used for processing */}
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* GridPreset: visible UI using your components */}
-      <div className="w-full max-w-[1280px] max-h-[720px]">
-        {gridLayout ? (
+      {/* CONTENT: Image or Grid */}
+      {isImageStep && currentImage ? (
+        // IMAGE STEP: Show fullscreen image
+        <div className="absolute inset-0 flex items-center justify-center bg-black">
+          <img
+            src={`/${currentImage.path}`}
+            alt={currentImage.description}
+            className="w-full h-full object-cover"
+          />
+        </div>
+      ) : gridLayout ? (
+        // GRID STEP: Show grid preset
+        <div className="w-full max-w-[1280px] max-h-[720px]">
           <GridPreset
             shape={gridLayout.shape === "square" ? "circle" : (gridLayout.shape as "circle" | "rectangle")}
             size={gridLayout.size}
@@ -554,22 +588,21 @@ export default function ProjectionPage() {
             pagination={true}
             completedStates={circleStates}
             onShapeClick={handleShapeClick}
-            // note: GridPreset will handle internal paging; we supply completedStates globally
           />
-        ) : (
-          <div className="p-8 text-center">Laden...</div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="p-8 text-center">Laden...</div>
+      )}
 
-      {/* Countdown display */}
-      {countdown !== null && countdown > 0 && (
+      {/* Countdown display (only for grid steps) */}
+      {!isImageStep && countdown !== null && countdown > 0 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-9xl font-bold text-green-500 drop-shadow-[0_0_30px_rgba(0,255,0,0.7)]">{countdown}</div>
         </div>
       )}
 
-      {/* Done display */}
-      {isDone && !isAllStepsComplete && (
+      {/* Done display (only for grid steps) */}
+      {!isImageStep && isDone && !isAllStepsComplete && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-9xl font-bold text-blue-500 drop-shadow-[0_0_30px_rgba(0,100,255,0.7)]">done</div>
         </div>
