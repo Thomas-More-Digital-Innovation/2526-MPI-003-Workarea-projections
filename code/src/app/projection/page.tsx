@@ -596,21 +596,21 @@ export default function ProjectionPage() {
 
       {/* Countdown display (only for grid steps) */}
       {!isImageStep && countdown !== null && countdown > 0 && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="absolute inset-0 flex items-end justify-center pointer-events-none">
           <div className="text-9xl font-bold text-green-500 drop-shadow-[0_0_30px_rgba(0,255,0,0.7)]">{countdown}</div>
         </div>
       )}
 
       {/* Done display (only for grid steps) */}
       {!isImageStep && isDone && !isAllStepsComplete && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="absolute inset-0 flex items-end justify-center pointer-events-none">
           <div className="text-9xl font-bold text-blue-500 drop-shadow-[0_0_30px_rgba(0,100,255,0.7)]">done</div>
         </div>
       )}
 
       {/* All steps complete display */}
       {isAllStepsComplete && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="absolute inset-0 flex items-end justify-center pointer-events-none">
           <div className="text-8xl font-bold text-green-500 drop-shadow-[0_0_30px_rgba(0,255,0,0.7)]">
             alle stappen zijn klaar
           </div>
