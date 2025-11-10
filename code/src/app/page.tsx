@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Navbar, Button, Popup, GridCard, Footer } from "@/components";
 import { Link } from "lucide-react";
 import { useRouter } from "next/navigation";
+import preset from "./preset/page";
 
 interface CardData {
   id: number;
@@ -137,10 +138,6 @@ export default function Home() {
             </div>
           )}
         </div>
-
-        {/* Uncomment these if needed */}
-        {/* <Button onClick={handleCalibration} text="Start Calibratie" />
-        <Button text="Grid toevoegen (tijdelijke link)" onClick={() => setShowPopup(true)} /> */}
       </main>
 
       <Footer>

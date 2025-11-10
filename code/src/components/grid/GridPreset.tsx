@@ -75,7 +75,7 @@ const GridPreset: React.FC<GridPresetProps> = ({
         {/* Grid */}
         <div className="flex-1 flex items-center justify-center">
           <div
-            className="grid gap-1 justify-center"
+            className="grid gap-20 justify-center"
             style={{
               gridTemplateColumns: `repeat(${config.cols}, auto)`,
               gridTemplateRows: `repeat(${config.rows}, auto)`,
