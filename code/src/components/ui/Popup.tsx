@@ -23,6 +23,8 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [hoveredBox, setHoveredBox] = React.useState<'export' | 'import' | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [exportImportMessage, setExportImportMessage] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const handleDivClick = () => {
     fileInputRef.current?.click();
@@ -45,16 +47,13 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
     setFileError(null);
     console.log("Selected file:", file.name);
 
-    // Basic upload handling: if Electron preload API is available, save file via IPC
     try {
       if (typeof globalThis !== 'undefined' && (globalThis as any).electronAPI?.addImage) {
         const arrayBuffer = await file.arrayBuffer();
         const fileData = { name: file.name, buffer: new Uint8Array(arrayBuffer) };
         await (globalThis as any).electronAPI.addImage(fileData, file.name);
-        // close popup after successful upload
         onClose?.();
       } else {
-        // Fallback: just log and keep the popup open
         console.log('No electron API available - file ready for upload', file.name);
       }
     } catch (err) {
@@ -63,9 +62,71 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
     }
   };
 
+  const handleExport = async () => {
+    setIsProcessing(true);
+    setExportImportMessage(null);
+    
+    try {
+      if (typeof globalThis !== 'undefined' && (globalThis as any).electronAPI?.exportData) {
+        const result = await (globalThis as any).electronAPI.exportData();
+        
+        if (result.success) {
+          setExportImportMessage('✅ Export succesvol!');
+          setTimeout(() => {
+            onClose?.();
+          }, 1500);
+        } else if (result.canceled) {
+          setExportImportMessage('Export geannuleerd');
+        } else {
+          setExportImportMessage(`❌ Export mislukt: ${result.error || 'Onbekende fout'}`);
+        }
+      } else {
+        setExportImportMessage('❌ Electron API niet beschikbaar');
+      }
+    } catch (err) {
+      console.error('Export error:', err);
+      setExportImportMessage('❌ Export mislukt. Probeer opnieuw.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleImport = async () => {
+    setIsProcessing(true);
+    setExportImportMessage(null);
+    
+    try {
+      if (typeof globalThis !== 'undefined' && (globalThis as any).electronAPI?.importData) {
+        const result = await (globalThis as any).electronAPI.importData();
+        
+        if (result.success) {
+          const stats = result.stats;
+          setExportImportMessage(
+            `✅ Import succesvol!\n${stats.images} afbeeldingen, ${stats.gridLayouts} grids, ${stats.presets} presets, ${stats.steps} stappen`
+          );
+          setTimeout(() => {
+            onClose?.();
+            // Reload the page to reflect imported data
+            window.location.reload();
+          }, 2000);
+        } else if (result.canceled) {
+          setExportImportMessage('Import geannuleerd');
+        } else {
+          setExportImportMessage(`❌ Import mislukt: ${result.error || 'Onbekende fout'}`);
+        }
+      } else {
+        setExportImportMessage('❌ Electron API niet beschikbaar');
+      }
+    } catch (err) {
+      console.error('Import error:', err);
+      setExportImportMessage('❌ Import mislukt. Probeer opnieuw.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const images = new Array(3).fill("praline.jpeg");
   const title = POPUP_TITLES[popupType] || "Popup";
-
 
   const [amount, setAmount] = useState("");
   const [shape, setShape] = useState<"circle" | "rectangle">("circle");
@@ -170,35 +231,51 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
         )}
 
         {popupType === "exportImport" && (
-          <div className="w-full flex justify-center">
-            <button
-              type="button"
-              onClick={() => { /* import handler placeholder */ }}
-              onMouseEnter={() => setHoveredBox('import')}
-              onMouseLeave={() => setHoveredBox(null)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); /* import handler placeholder */ } }}
-              className="w-[95%] h-[25vw] m-2 flex justify-center items-center rounded-2xl shadow cursor-pointer transition-colors duration-200"
-              style={{ backgroundColor: hoveredBox === 'import' ? 'var(--hover-white)' : 'var(--color-white)' }}
-            >
-              <div className="flex-col justify-center text-center">
-                <ArrowDownOnSquareIcon className="h-30 w-30 text-[var(--color-primary)]"/>
-                <p className="mt-4 text-4xl font-semibold">Import</p>
+          <div>
+            <div className="w-full flex justify-center">
+              <button
+                type="button"
+                onClick={handleImport}
+                onMouseEnter={() => setHoveredBox('import')}
+                onMouseLeave={() => setHoveredBox(null)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleImport(); } }}
+                disabled={isProcessing}
+                className="w-[95%] h-[25vw] m-2 flex justify-center items-center rounded-2xl shadow cursor-pointer transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: hoveredBox === 'import' ? 'var(--hover-white)' : 'var(--color-white)' }}
+              >
+                <div className="flex-col justify-center text-center">
+                  <ArrowDownOnSquareIcon className="h-30 w-30 text-[var(--color-primary)]"/>
+                  <p className="mt-4 text-4xl font-semibold">Import</p>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={handleExport}
+                onMouseEnter={() => setHoveredBox('export')}
+                onMouseLeave={() => setHoveredBox(null)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleExport(); } }}
+                disabled={isProcessing}
+                className="w-[95%] h-[25vw] m-2 flex justify-center items-center rounded-2xl shadow cursor-pointer transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: hoveredBox === 'export' ? 'var(--hover-white)' : 'var(--color-white)' }}
+              >
+                <div className="flex-col justify-center text-center">
+                  <ArrowUpOnSquareIcon className="h-30 w-30 text-[var(--color-primary)]"/>
+                  <p className="mt-4 text-4xl font-semibold">Export</p>
+                </div>
+              </button>
+            </div>
+            
+            {exportImportMessage && (
+              <div className="mt-4 p-3 bg-white rounded-lg text-center whitespace-pre-line">
+                <p className="text-[var(--dark-text)]">{exportImportMessage}</p>
               </div>
-            </button>
-            <button
-              type="button"
-              onClick={() => { /* export handler placeholder */ }}
-              onMouseEnter={() => setHoveredBox('export')}
-              onMouseLeave={() => setHoveredBox(null)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); /* export handler placeholder */ } }}
-              className="w-[95%] h-[25vw] m-2 flex justify-center items-center rounded-2xl shadow cursor-pointer transition-colors duration-200"
-              style={{ backgroundColor: hoveredBox === 'export' ? 'var(--hover-white)' : 'var(--color-white)' }}
-            >
-              <div className="flex-col justify-center text-center">
-                <ArrowUpOnSquareIcon className="h-30 w-30 text-[var(--color-primary)]"/>
-                <p className="mt-4 text-4xl font-semibold">Export</p>
+            )}
+            
+            {isProcessing && (
+              <div className="mt-4 text-center">
+                <p className="text-[var(--dark-text)]">Verwerken...</p>
               </div>
-            </button>
+            )}
           </div>
         )}
 

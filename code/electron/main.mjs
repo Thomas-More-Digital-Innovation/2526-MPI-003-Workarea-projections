@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain } from 'electron';
+import { app, BrowserWindow, globalShortcut, ipcMain, dialog } from 'electron';
 import path from 'path';
 import url from 'url';
 import Database from 'better-sqlite3';
@@ -58,8 +58,8 @@ db.prepare(`
 // ✅ Insert sample data (fixed missing variable 'insert')
 if (db.prepare('SELECT COUNT(*) AS count FROM GridLayout').get().count === 0) {
   const insert = db.prepare('INSERT INTO GridLayout (amount, shape, size) VALUES (?, ?, ?)');
-  insert.run(6, 'circle', 'medium');
-  insert.run(3, 'circle', 'medium');
+  insert.run(6, 'rectangle', 'medium');
+  insert.run(3, 'rectangle', 'medium');
 }
 
 if (db.prepare('SELECT COUNT(*) AS count FROM Preset').get().count === 0) {
@@ -72,6 +72,7 @@ if (db.prepare('SELECT COUNT(*) AS count FROM Step').get().count === 0) {
   insert.run(1, 1, 1);
   insert.run(2, 2, 1);
 }
+
 
 //
 // 🧱 IMAGE CRUD
@@ -220,6 +221,139 @@ ipcMain.handle('step:update', (event, { stepId, step, imageId, gridLayoutId, pre
 ipcMain.handle('step:delete', (event, stepId) => {
   db.prepare('DELETE FROM Step WHERE stepId = ?').run(stepId);
   return { success: true };
+});
+
+//
+// 📤📥 EXPORT/IMPORT
+//
+ipcMain.handle('data:export', async () => {
+  try {
+    // Get all data from database
+    const images = db.prepare('SELECT * FROM Image').all();
+    const gridLayouts = db.prepare('SELECT * FROM GridLayout').all();
+    const presets = db.prepare('SELECT * FROM Preset').all();
+    const steps = db.prepare('SELECT * FROM Step').all();
+
+    const exportData = {
+      version: '1.0',
+      exportDate: new Date().toISOString(),
+      data: {
+        images,
+        gridLayouts,
+        presets,
+        steps
+      }
+    };
+
+    // Show save dialog
+    const { filePath, canceled } = await dialog.showSaveDialog({
+      title: 'Exporteer Database',
+      defaultPath: `preset-export-${Date.now()}.json`,
+      filters: [
+        { name: 'JSON Files', extensions: ['json'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+
+    if (canceled || !filePath) {
+      return { success: false, canceled: true };
+    }
+
+    // Write JSON file
+    fs.writeFileSync(filePath, JSON.stringify(exportData, null, 2), 'utf-8');
+    
+    return { success: true, filePath };
+  } catch (err) {
+    console.error('Export failed:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('data:import', async () => {
+  try {
+    // Show open dialog
+    const { filePaths, canceled } = await dialog.showOpenDialog({
+      title: 'Importeer Database',
+      filters: [
+        { name: 'JSON Files', extensions: ['json'] },
+        { name: 'All Files', extensions: ['*'] }
+      ],
+      properties: ['openFile']
+    });
+
+    if (canceled || filePaths.length === 0) {
+      return { success: false, canceled: true };
+    }
+
+    const filePath = filePaths[0];
+    const fileContent = fs.readFileSync(filePath, 'utf-8');
+    const importData = JSON.parse(fileContent);
+
+    // Validate import data structure
+    if (!importData.data || !importData.data.images || !importData.data.gridLayouts || 
+        !importData.data.presets || !importData.data.steps) {
+      return { success: false, error: 'Ongeldig bestandsformaat' };
+    }
+
+    // Begin transaction
+    db.prepare('BEGIN').run();
+
+    try {
+      // Clear existing data
+      db.prepare('DELETE FROM Step').run();
+      db.prepare('DELETE FROM Image').run();
+      db.prepare('DELETE FROM GridLayout').run();
+      db.prepare('DELETE FROM Preset').run();
+
+      // Reset autoincrement
+      db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('Image', 'GridLayout', 'Preset', 'Step')").run();
+
+      // Import Images
+      const imageStmt = db.prepare('INSERT INTO Image (imageId, path, description) VALUES (?, ?, ?)');
+      for (const img of importData.data.images) {
+        imageStmt.run(img.imageId, img.path, img.description);
+      }
+
+      // Import GridLayouts
+      const gridStmt = db.prepare('INSERT INTO GridLayout (gridLayoutId, amount, shape, size) VALUES (?, ?, ?, ?)');
+      for (const grid of importData.data.gridLayouts) {
+        gridStmt.run(grid.gridLayoutId, grid.amount, grid.shape, grid.size);
+      }
+
+      // Import Presets
+      const presetStmt = db.prepare('INSERT INTO Preset (presetId, name, description) VALUES (?, ?, ?)');
+      for (const preset of importData.data.presets) {
+        presetStmt.run(preset.presetId, preset.name, preset.description);
+      }
+
+      // Import Steps
+      const stepStmt = db.prepare('INSERT INTO Step (stepId, step, imageId, gridLayoutId, presetId) VALUES (?, ?, ?, ?, ?)');
+      for (const step of importData.data.steps) {
+        stepStmt.run(step.stepId, step.step, step.imageId, step.gridLayoutId, step.presetId);
+      }
+
+      // Commit transaction
+      db.prepare('COMMIT').run();
+
+      return { 
+        success: true, 
+        filePath,
+        stats: {
+          images: importData.data.images.length,
+          gridLayouts: importData.data.gridLayouts.length,
+          presets: importData.data.presets.length,
+          steps: importData.data.steps.length
+        }
+      };
+    } catch (err) {
+      // Rollback on error
+      db.prepare('ROLLBACK').run();
+      throw err;
+    }
+  } catch (err) {
+    console.error('Import failed:', err);
+    return { success: false, error: err.message };
+  }
 });
 
 //
