@@ -616,6 +616,11 @@ export default function ProjectionPage() {
           </div>
         </div>
       )}
+      {/* Step page number */}
+      <div className="absolute top-4 right-4 text-6xl font-bold text-blue-500 drop-shadow-[0_0_30px_rgba(0,100,255,0.7)]">
+        {localStorage.getItem("currentStepIndex") ? Number(localStorage.getItem("currentStepIndex")) + 1 : 1}
+      </div>
+
     </div>
   );
 }
