@@ -28,4 +28,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // Combined query for presets with gridlayouts
   getPresetsWithGridLayouts: () => ipcRenderer.invoke('preset:getWithGridLayouts'),
+
+  //Export/import
+  exportData: () => ipcRenderer.invoke('data:export'),
+  importData: () => ipcRenderer.invoke('data:import'),
 });
