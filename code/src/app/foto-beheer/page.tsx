@@ -118,7 +118,7 @@ export default function FotosBeheren() {
       </div>
 
       {/* Footer Buttons - over volle breedte */}
-      <div className="px-4 py-4">
+      <div className="p-4">
         <div className="w-full rounded-2xl shadow-md" style={{ backgroundColor: 'var(--color-white)' }}>
           <Footer>
             <Button text="Terug" type="primary" onClick={handleTerug} fullWidth={false} fixedWidth={true} />

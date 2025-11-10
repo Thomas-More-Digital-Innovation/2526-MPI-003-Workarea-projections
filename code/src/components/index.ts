@@ -2,6 +2,7 @@
 export { default as Button } from './ui/Button';
 export { default as Dropdown } from './ui/Dropdown';
 export { default as Popup } from './ui/Popup';
+export { default as Toast } from './ui/Toast';
 
 // Form Components
 export { default as InputField } from './forms/InputField';
