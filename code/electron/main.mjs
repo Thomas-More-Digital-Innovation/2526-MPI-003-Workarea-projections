@@ -56,6 +56,22 @@ db.prepare(`
 `).run();
 
 // ✅ Insert sample data (fixed missing variable 'insert')
+if (db.prepare('SELECT COUNT(*) AS count FROM GridLayout').get().count === 0) {
+  const insert = db.prepare('INSERT INTO GridLayout (amount, shape, size) VALUES (?, ?, ?)');
+  insert.run(6, 'rectangle', 'medium');
+  insert.run(3, 'rectangle', 'medium');
+}
+
+if (db.prepare('SELECT COUNT(*) AS count FROM Preset').get().count === 0) {
+  db.prepare('INSERT INTO Preset (name, description) VALUES (?, ?)')
+    .run('Voorbeeld Preset', 'Dit is een voorbeeldpreset');
+}
+
+if (db.prepare('SELECT COUNT(*) AS count FROM Step').get().count === 0) {
+  const insert = db.prepare('INSERT INTO Step (step, gridLayoutId, presetId) VALUES (?, ?, ?)');
+  insert.run(1, 1, 1);
+  insert.run(2, 2, 1);
+}
 
 
 //

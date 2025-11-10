@@ -6,6 +6,7 @@ interface ShapeProps {
   size: "small" | "medium" | "large";
   completed: boolean;
   scale?: number;
+  onClick?: () => void;
 }
 
 const SHAPE_SIZES = {
@@ -45,6 +46,7 @@ const Shape: React.FC<ShapeProps> = ({
   size,
   completed = false,
   scale = 1,
+  onClick,
 }) => {
   const sizeStyles = {
     width: `${SHAPE_SIZES[shape][size].width * scale}vw`,
@@ -65,15 +67,13 @@ const Shape: React.FC<ShapeProps> = ({
   };
 
   return (
-    <div className="relative inline-block">
-      {/* Shape */}
+    <div className="relative inline-block" onClick={onClick}>
       <div
         style={sizeStyles}
         className={`border-2 ${borderColor} ${
           shape === "circle" ? "rounded-full" : "rounded-lg"
-        }`}
+        } transition-colors duration-200`}
       >
-        {/* Completed badge */}
         {completed && (
           <div
             className="absolute bg-green-500 rounded-full flex items-center justify-center border-2 border-white"

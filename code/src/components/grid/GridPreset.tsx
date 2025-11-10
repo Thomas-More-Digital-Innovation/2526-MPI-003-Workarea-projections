@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Shape from "./Shape";
 import { ArrowLeftCircleIcon, ArrowRightCircleIcon } from "@heroicons/react/24/solid";
 
@@ -8,7 +8,10 @@ interface GridPresetProps {
   scale?: number;
   total: number;
   perPage?: number;
-  pagination?: boolean; // controls whether pagination UI is visible; defaults to true
+  pagination?: boolean;
+  completedStates?: boolean[];
+  onShapeClick?: (index: number) => void; // ✅ klik op een shape
+  onPageChange?: (page: number) => void;  // ✅ paginawijziging
 }
 
 const GRID_CONFIG = {
@@ -20,33 +23,44 @@ const GRID_CONFIG = {
   "circle-large": { rows: 1, cols: 4, maxPerPage: 4 },
 } as const;
 
-const GridPreset: React.FC<GridPresetProps> = ({ shape, size, scale = 1, total, perPage = total, pagination = true }) => {
-  const gridConfig = GRID_CONFIG;
-
+const GridPreset: React.FC<GridPresetProps> = ({
+  shape,
+  size,
+  scale = 1,
+  total,
+  perPage = total,
+  pagination = true,
+  completedStates = [],
+  onShapeClick,
+  onPageChange,
+}) => {
   const key = `${shape}-${size}`;
-  const config = gridConfig[key as keyof typeof GRID_CONFIG];
+  const config = GRID_CONFIG[key as keyof typeof GRID_CONFIG];
   const effectivePerPage = Math.min(perPage, config.maxPerPage);
   const totalPages = Math.ceil(total / effectivePerPage);
 
   const [page, setPage] = useState(0);
 
-  // Reset pagina naar 0 als shape, size of total veranderen
-React.useEffect(() => {
-  setPage(0);
-}, [shape, size, total]);
+  // Reset pagina naar 0 bij wijzigingen in vorm of totaal
+  useEffect(() => {
+    setPage(0);
+  }, [shape, size, total]);
+
+  // Meld pagina aan parent
+  useEffect(() => {
+    if (onPageChange) onPageChange(page);
+  }, [page, onPageChange]);
 
   const startIndex = page * effectivePerPage;
   const endIndex = Math.min(startIndex + effectivePerPage, total);
   const shapesArray = Array.from({ length: total }).slice(startIndex, endIndex);
 
-  // showArrows controls visibility of pagination UI; internal pagination logic still applies
   const showArrows = pagination && totalPages > 1 && scale !== 1;
 
   return (
     <div className="relative w-full h-full flex flex-col items-center justify-center">
-      {/* Use a full-width row where the center container grows and centers its content */}
       <div className="flex items-center w-full">
-        {/* Linkerpijl of placeholder */}
+        {/* Linkerpijl */}
         {showArrows ? (
           <ArrowLeftCircleIcon
             className={`w-10 h-10 text-[var(--color-primary)] cursor-pointer transition-opacity duration-200 mx-2 ${
@@ -55,10 +69,10 @@ React.useEffect(() => {
             onClick={() => setPage((prev) => Math.max(prev - 1, 0))}
           />
         ) : (
-          <div className="w-10 h-10 mx-2" /> // placeholder voor centrering
+          <div className="w-10 h-10 mx-2" />
         )}
 
-        {/* Grid: center container grows and centers the grid */}
+        {/* Grid */}
         <div className="flex-1 flex items-center justify-center">
           <div
             className="grid gap-1 justify-center"
@@ -67,19 +81,27 @@ React.useEffect(() => {
               gridTemplateRows: `repeat(${config.rows}, auto)`,
             }}
           >
-            {shapesArray.map((_, index) => (
-              <Shape
-                key={startIndex + index}
-                shape={shape}
-                size={size}
-                completed={false}
-                scale={scale}
-              />
-            ))}
+            {shapesArray.map((_, index) => {
+              const absoluteIndex = startIndex + index;
+              const completed = completedStates
+                ? !!completedStates[absoluteIndex]
+                : false;
+
+              return (
+                <Shape
+                  key={absoluteIndex}
+                  shape={shape}
+                  size={size}
+                  completed={completed}
+                  scale={scale}
+                  onClick={() => onShapeClick && onShapeClick(absoluteIndex)} // ✅ vaste naam en veilige check
+                />
+              );
+            })}
           </div>
         </div>
 
-        {/* Rechterpijl of placeholder */}
+        {/* Rechterpijl */}
         {showArrows ? (
           <ArrowRightCircleIcon
             className={`w-10 h-10 text-[var(--color-primary)] cursor-pointer transition-opacity duration-200 mx-2 ${
@@ -90,11 +112,10 @@ React.useEffect(() => {
             onClick={() => setPage((prev) => Math.min(prev + 1, totalPages - 1))}
           />
         ) : (
-          <div className="w-10 h-10 mx-2" /> // placeholder voor centrering
+          <div className="w-10 h-10 mx-2" />
         )}
       </div>
 
-      {/* Pagina-indicator */}
       {showArrows && (
         <div className="absolute bottom-1 mt-2 text-sm text-gray-500">
           Pagina {page + 1} van {totalPages}
