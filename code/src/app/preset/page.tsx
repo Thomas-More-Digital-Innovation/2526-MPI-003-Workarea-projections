@@ -15,6 +15,7 @@ interface CardData {
 
 export default function preset() {
   const [showPopup, setShowPopup] = useState(false);
+  const [showPopupImage, setShowPopupImage] = useState(false);
   const router = useRouter();
 
 
@@ -30,7 +31,7 @@ export default function preset() {
       <main id="Presets" className="bg-white shadow-md px-3 py-3 flex justify-between rounded-2xl w-full flex-1">
         <div className="flex flex-row w-screen">
           <Button text="Grid toevoegen" onClick={() => setShowPopup(true)} />
-          <Button text="Foto Toevoegen"  />
+          <Button text="Foto Toevoegen" onClick={() => setShowPopupImage(true)} />
         </div>
         
       </main>
@@ -46,6 +47,17 @@ export default function preset() {
           <button
             className="absolute top-4 right-4 text-white text-2xl"
             onClick={() => setShowPopup(false)}
+          >
+            &times;
+          </button>
+        </div>
+      )}
+      {showPopupImage && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+          <Popup popupType="imageUpload" onClose={() => setShowPopupImage(false)} />
+          <button
+            className="absolute top-4 right-4 text-white text-2xl"
+            onClick={() => setShowPopupImage(false)}
           >
             &times;
           </button>

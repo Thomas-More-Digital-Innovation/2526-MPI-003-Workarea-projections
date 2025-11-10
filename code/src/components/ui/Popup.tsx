@@ -25,33 +25,25 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
   const [fileError, setFileError] = useState<string | null>(null);
   const [exportImportMessage, setExportImportMessage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [recentImages, setRecentImages] = useState<string[]>([]);
 
   const handleDivClick = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const uploadFile = async (file: File) => {
     if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      setFileError("Alleen afbeeldingsbestanden toegestaan (PNG, JPG, GIF).");
-      return;
-    }
-
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxSize) {
-      setFileError("Maximale bestandsgrootte is 5MB.");
-      return;
-    }
-    setFileError(null);
-    console.log("Selected file:", file.name);
-
     try {
       if (typeof globalThis !== 'undefined' && (globalThis as any).electronAPI?.addImage) {
         const arrayBuffer = await file.arrayBuffer();
         const fileData = { name: file.name, buffer: new Uint8Array(arrayBuffer) };
         await (globalThis as any).electronAPI.addImage(fileData, file.name);
+        // cleanup any object URL used for preview
+        if (previewImage && previewImage.startsWith('blob:')) URL.revokeObjectURL(previewImage);
+        setPreviewImage(null);
+        setSelectedFile(null);
         onClose?.();
       } else {
         console.log('No electron API available - file ready for upload', file.name);
@@ -60,6 +52,73 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
       console.error('Upload failed', err);
       setFileError('Upload is mislukt. Probeer opnieuw.');
     }
+  };
+
+  // Called when the hidden file input changes - set preview and selectedFile but do NOT upload yet
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setFileError('Alleen afbeeldingsbestanden toegestaan (PNG, JPG, GIF).');
+      return;
+    }
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      setFileError('Maximale bestandsgrootte is 5MB.');
+      return;
+    }
+    setFileError(null);
+    const url = URL.createObjectURL(file);
+    setPreviewImage(url);
+    setSelectedFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setFileError('Alleen afbeeldingsbestanden toegestaan (PNG, JPG, GIF).');
+      return;
+    }
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setFileError('Maximale bestandsgrootte is 5MB.');
+      return;
+    }
+    setFileError(null);
+    const url = URL.createObjectURL(file);
+    setPreviewImage(url);
+    setSelectedFile(file);
+  };
+
+  const handleRecentImageSelect = (src: string) => {
+    setPreviewImage(src);
+    setSelectedFile(null);
+  };
+
+  const handleSave = async () => {
+    // If a file was selected, upload it. Otherwise just close.
+    if (selectedFile) {
+      try {
+        await uploadFile(selectedFile);
+      } catch (err) {
+        console.error('Save/upload failed', err);
+        setFileError('Opslaan mislukt. Probeer opnieuw.');
+        return;
+      } finally {
+        if (previewImage && previewImage.startsWith('blob:')) URL.revokeObjectURL(previewImage);
+      }
+    }
+    // Close popup in all cases
+    setPreviewImage(null);
+    setSelectedFile(null);
+    onClose?.();
   };
 
   const handleExport = async () => {
@@ -124,9 +183,29 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
       setIsProcessing(false);
     }
   };
-
-  const images = new Array(3).fill("praline.jpeg");
   const title = POPUP_TITLES[popupType] || "Popup";
+
+  React.useEffect(() => {
+    if (popupType !== 'imageUpload') return;
+
+    (async () => {
+      try {
+        if (typeof globalThis !== 'undefined' && (globalThis as any).electronAPI?.getImages) {
+          const imgs = await (globalThis as any).electronAPI.getImages();
+          if (Array.isArray(imgs) && imgs.length > 0) {
+            const sorted = imgs.slice().sort((a: any, b: any) => b.imageId - a.imageId).slice(0, 3);
+            const paths = sorted.map((i: any) => (i.path?.startsWith('/') ? i.path : '/' + i.path));
+            setRecentImages(paths);
+          } else {
+            setRecentImages([]);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load recent images', err);
+        setRecentImages([]);
+      }
+    })();
+  }, [popupType]);
 
   const [amount, setAmount] = useState("");
   const [shape, setShape] = useState<"circle" | "rectangle">("circle");
@@ -149,7 +228,7 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
       <input
         type="file"
         ref={fileInputRef}
-        onChange={handleFileChange}
+        onChange={handleFileSelect}
         style={{ display: "none" }}
       />
       <button className="absolute top-4 right-3" onClick={onClose}>
@@ -161,32 +240,53 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
 
         {popupType === "imageUpload" && (
           <>
-            <button
-              type="button"
-              onClick={handleDivClick}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleDivClick(); } }}
-              aria-label="Upload afbeelding"
-              className="h-60 p-6 bg-[var(--color-white)] text-[var(--color-text)] rounded-2xl shadow cursor-pointer flex flex-col justify-center items-center"
-            >
-              <CloudArrowUpIcon className="h-15 w-15 text-[var(--color-primary)]" />
-              <p className="text-[var(--color-text)] text-lg">Upload een bestand of sleep</p>
-              <p className="text-gray-400">PNG, JPG, GIF tot 5MB</p>
-            </button>
+            <div className="flex justify-center">
+              <div
+                onClick={handleDivClick}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                className="h-60 w-full p-0 bg-[var(--color-white)] text-[var(--color-text)] rounded-2xl shadow cursor-pointer flex flex-col justify-center items-center border-2 border-dashed border-gray-300 hover:border-[var(--color-primary)] transition-colors overflow-hidden"
+              >
+                {previewImage ? (
+                  <div className="relative h-full w-full flex items-center justify-center bg-[var(--color-white)]">
+                    <img
+                      src={previewImage}
+                      alt="Preview"
+                      className="w-full h-full object-contain object-center"
+                    />
+                  </div>
+                ) : (
+                  <div className="p-6 flex flex-col justify-center items-center">
+                    <CloudArrowUpIcon className="h-15 w-15 text-[var(--color-primary)]" />
+                    <p className="text-[var(--color-text)] text-lg">Upload een bestand of sleep</p>
+                    <p className="text-gray-400">PNG, JPG, GIF tot 5MB</p>
+                  </div>
+                )}
+              </div>
+            </div>
+            
             {fileError && (
               <p className="text-red-600 text-center my-3">{fileError}</p>
             )}
 
-            <p className="my-3 text-xl text-[var(--dark-text)] text-center">Of kies uit eerdere foto's</p>
-            <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mb-6">
-              {images.map((src, idx) => (
-                <img
-                  key={`${src}-${idx}`}
-                  src={src}
-                  alt={`doosje praline ${idx + 1}`}
-                  className="w-full h-40 object-cover rounded-2xl shadow"
-                />
-              ))}
-            </div>
+            <>
+              <p className="my-6 text-2xl text-[var(--dark-text)] text-center">Of kies uit eerdere foto's</p>
+              <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mb-6">
+                {recentImages.map((src, idx) => (
+                  <div
+                    key={`${src}-${idx}`}
+                    onClick={() => handleRecentImageSelect(src)}
+                    className="cursor-pointer rounded-2xl overflow-hidden shadow hover:shadow-lg transition-shadow h-[9vw] w-[9vw] mb-6 mx-3"
+                  >
+                    <img
+                      src={src}
+                      alt={`Recent ${idx + 1}`}
+                      className="w-full h-full object-contain object-center"
+                    />
+                  </div>
+                ))}
+              </div>
+            </>
           </>
         )}
 
@@ -321,7 +421,7 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
                 <Button type="secondary" text="Annuleren" onClick={onClose} />
               </div>
               <div className="w-[282px]">
-                <Button type="primary" text="Opslaan" />
+                <Button type="primary" text="Opslaan" onClick={handleSave} />
               </div>
             </div>
           )}
