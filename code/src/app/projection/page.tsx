@@ -21,17 +21,12 @@ interface Circle {
   radius: number;
 }
 
-// Define 8 circles in a grid pattern (2x4) - outside component to avoid recreating
-const CIRCLES: Circle[] = [
-  { id: 0, x: 160, y: 180, radius: 120 },
-  { id: 1, x: 480, y: 180, radius: 120 },
-  { id: 2, x: 800, y: 180, radius: 120 },
-  { id: 3, x: 1120, y: 180, radius: 120 },
-  { id: 4, x: 160, y: 540, radius: 120 },
-  { id: 5, x: 480, y: 540, radius: 120 },
-  { id: 6, x: 800, y: 540, radius: 120 },
-  { id: 7, x: 1120, y: 540, radius: 120 },
-];
+interface GridLayout {
+  gridLayoutId: number;
+  amount: number;
+  shape: string;
+  size: string;
+}
 
 export default function ProjectionPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -39,8 +34,129 @@ export default function ProjectionPage() {
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const [calibrationData, setCalibrationData] = useState<CalibrationData | null>(null);
   const [isWebcamActive, setIsWebcamActive] = useState(false);
-  const [circleStates, setCircleStates] = useState<boolean[]>(new Array(8).fill(false));
+  const [circles, setCircles] = useState<Circle[]>([]);
+  const [circleStates, setCircleStates] = useState<boolean[]>([]);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [isCountingDown, setIsCountingDown] = useState(false);
+  const [isDone, setIsDone] = useState(false); // New state for "done" status
+  const [isAllStepsComplete, setIsAllStepsComplete] = useState(false); // New state for completion
   const router = useRouter();
+
+  // Step-by-step workflow: load steps and grid layout
+  useEffect(() => {
+    const loadStepAndGridLayout = async () => {
+      const presetId = localStorage.getItem('currentPresetId');
+      let stepIndex = Number(localStorage.getItem('currentStepIndex') || '0');
+
+      if (!presetId) {
+        if (confirm('No preset selected. Click OK to return to homepage.')) {
+          router.push('/');
+        }
+        return;
+      }
+
+      try {
+        const api = (globalThis as any)?.electronAPI;
+        if (!api?.getStepsByPreset) {
+          alert('Cannot load steps - API method not available');
+          router.push('/');
+          return;
+        }
+        const steps = await api.getStepsByPreset(Number(presetId));
+        if (!steps || steps.length === 0) {
+          alert('No steps found for this preset');
+          router.push('/');
+          return;
+        }
+        if (stepIndex >= steps.length) {
+          alert('All steps completed!');
+          router.push('/');
+          return;
+        }
+        const currentStep = steps[stepIndex];
+        if (!currentStep.gridLayoutId) {
+          alert('Step has no grid layout');
+          router.push('/');
+          return;
+        }
+        localStorage.setItem('currentGridLayoutId', currentStep.gridLayoutId.toString());
+        localStorage.setItem('currentStepIndex', stepIndex.toString());
+        // Load grid layout
+        if (!api?.getGridLayouts) {
+          alert('Cannot load grid layout - API method not available');
+          router.push('/');
+          return;
+        }
+        const allGridLayouts = await api.getGridLayouts();
+        const gridLayout = allGridLayouts.find((layout: GridLayout) => layout.gridLayoutId === Number(currentStep.gridLayoutId));
+        if (!gridLayout) {
+          alert(`Grid layout with ID ${currentStep.gridLayoutId} not found in database`);
+          router.push('/');
+          return;
+        }
+        const generatedCircles = generateCirclesFromLayout(gridLayout);
+        setCircles(generatedCircles);
+        setCircleStates(new Array(generatedCircles.length).fill(false));
+      } catch (err) {
+        alert(`Error loading step/grid configuration: ${err}`);
+        router.push('/');
+      }
+    };
+    loadStepAndGridLayout();
+  }, [router]);
+
+  // Generate circles based on grid layout
+  const generateCirclesFromLayout = (layout: GridLayout): Circle[] => {
+    const { amount, shape, size } = layout;
+    const circles: Circle[] = [];
+    
+    // Canvas dimensions
+    const canvasWidth = 1280;
+    const canvasHeight = 720;
+    
+    // Determine radius based on size
+    let radius = 80; // default
+    if (size === 'small') radius = 60;
+    else if (size === 'medium') radius = 100;
+    else if (size === 'large') radius = 140;
+    
+    // Calculate grid dimensions based on amount and shape
+    let cols = 0;
+    let rows = 0;
+    
+    if (shape === 'square') {
+      cols = Math.ceil(Math.sqrt(amount));
+      rows = Math.ceil(amount / cols);
+    } else if (shape === 'rectangle') {
+      // Prefer wider layouts for rectangles
+      cols = Math.ceil(Math.sqrt(amount * 1.5));
+      rows = Math.ceil(amount / cols);
+    } else {
+      // Default to a reasonable grid
+      cols = Math.min(4, amount);
+      rows = Math.ceil(amount / cols);
+    }
+    
+    // Calculate spacing
+    const horizontalSpacing = canvasWidth / (cols + 1);
+    const verticalSpacing = canvasHeight / (rows + 1);
+    
+    // Generate circle positions
+    let id = 0;
+    for (let row = 0; row < rows && id < amount; row++) {
+      for (let col = 0; col < cols && id < amount; col++) {
+        circles.push({
+          id: id,
+          x: horizontalSpacing * (col + 1),
+          y: verticalSpacing * (row + 1),
+          radius: radius
+        });
+        id++;
+      }
+    }
+    
+    return circles;
+  };
 
   // Load calibration from localStorage
   useEffect(() => {
@@ -134,7 +250,7 @@ export default function ProjectionPage() {
 
   // Detect objects in each circle
   const detectObjectsInCircles = useCallback((imageData: Uint8ClampedArray, width: number, height: number) => {
-    const newCircleStates = CIRCLES.map(circle => {
+    const newCircleStates = circles.map(circle => {
       let totalPixels = 0;
       let darkPixels = 0;
 
@@ -170,7 +286,7 @@ export default function ProjectionPage() {
     });
 
     setCircleStates(newCircleStates);
-  }, []);
+  }, [circles]);
 
   // Apply calibration and detect objects
   const processFrame = useCallback(() => {
@@ -250,14 +366,14 @@ export default function ProjectionPage() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Draw circles
-    CIRCLES.forEach((circle, index) => {
+    circles.forEach((circle, index) => {
       ctx.beginPath();
       ctx.arc(circle.x, circle.y, circle.radius, 0, 2 * Math.PI);
       ctx.strokeStyle = circleStates[index] ? '#00ff00' : '#ff0000';
       ctx.lineWidth = 4;
       ctx.stroke();
     });
-  }, [circleStates]);
+  }, [circles, circleStates]);
 
   // Animation loop
   useEffect(() => {
@@ -269,7 +385,7 @@ export default function ProjectionPage() {
       animationFrameId = requestAnimationFrame(animate);
     };
     
-    if (isWebcamActive && calibrationData) {
+    if (isWebcamActive && calibrationData && circles.length > 0) {
       animate();
     }
     
@@ -278,11 +394,11 @@ export default function ProjectionPage() {
         cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [isWebcamActive, calibrationData, processFrame, drawOverlay]);
+  }, [isWebcamActive, calibrationData, circles, processFrame, drawOverlay]);
 
   // Auto-start webcam
   useEffect(() => {
-    if (calibrationData) {
+    if (calibrationData && circles.length > 0) {
       startWebcam();
     }
 
@@ -294,7 +410,90 @@ export default function ProjectionPage() {
       }
       setIsWebcamActive(false);
     };
-  }, [calibrationData, startWebcam]);
+  }, [calibrationData, circles, startWebcam]);
+
+  // Countdown logic and step advancement
+  useEffect(() => {
+    const allGreen = circleStates.length > 0 && circleStates.every(state => state === true);
+    const allRed = circleStates.length > 0 && circleStates.every(state => state === false);
+    
+    // If we're in "done" state and all circles are red, advance to next step
+    if (isDone && allRed) {
+      setIsDone(false);
+      // Advance to next step
+      const checkNextStep = async () => {
+        const presetId = localStorage.getItem('currentPresetId');
+        let stepIndex = Number(localStorage.getItem('currentStepIndex') || '0');
+        stepIndex++;
+        
+        try {
+          const api = (globalThis as any)?.electronAPI;
+          const steps = await api.getStepsByPreset(Number(presetId));
+          
+          if (stepIndex >= steps.length) {
+            // All steps completed - show completion message
+            console.log('🎉 All steps completed! Showing completion message...');
+            
+            // Stop the webcam
+            if (videoRef.current?.srcObject) {
+              const stream = videoRef.current.srcObject as MediaStream;
+              stream.getTracks().forEach(track => track.stop());
+              videoRef.current.srcObject = null;
+            }
+            
+            setIsAllStepsComplete(true);
+            
+            // After 5 seconds, clear storage and go to homepage
+            setTimeout(() => {
+              console.log('⏰ 5 seconds elapsed, returning to homepage...');
+              localStorage.removeItem('currentPresetId');
+              localStorage.removeItem('currentStepIndex');
+              localStorage.removeItem('currentGridLayoutId');
+              router.push('/');
+            }, 5000);
+          } else {
+            // Load next step
+            console.log(`⏭️ Loading step ${stepIndex + 1}...`);
+            localStorage.setItem('currentStepIndex', stepIndex.toString());
+            globalThis.location.reload();
+          }
+        } catch (err) {
+          console.error('Error checking next step:', err);
+          globalThis.location.reload();
+        }
+      };
+      checkNextStep();
+      return;
+    }
+    
+    // Only start countdown if not in "done" state
+    if (allGreen && !isCountingDown && !isDone) {
+      // Start countdown
+      setIsCountingDown(true);
+      setCountdown(5);
+    } else if (!allGreen && isCountingDown && !isDone) {
+      // Stop countdown if any circle turns red (only if not done)
+      setIsCountingDown(false);
+      setCountdown(null);
+    }
+  }, [circleStates, isCountingDown, isDone, router]);
+
+  // Countdown timer
+  useEffect(() => {
+    if (isCountingDown && countdown !== null && countdown > 0) {
+      const timer = setTimeout(() => {
+        setCountdown(countdown - 1);
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    } else if (countdown === 0) {
+      // Countdown finished - set done state
+      console.log('Countdown complete!');
+      setIsCountingDown(false);
+      setCountdown(null);
+      setIsDone(true);
+    }
+  }, [countdown, isCountingDown]);
 
   // ESC key handler to exit to homepage
   useEffect(() => {
@@ -319,7 +518,7 @@ export default function ProjectionPage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center">
+    <div className="min-h-screen bg-white flex items-center justify-center relative">
       {/* Hidden video element */}
       <video
         ref={videoRef}
@@ -342,6 +541,33 @@ export default function ProjectionPage() {
         height={720}
         className="w-full h-full"
       />
+
+      {/* Countdown display */}
+      {countdown !== null && countdown > 0 && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="text-9xl font-bold text-green-500 drop-shadow-[0_0_30px_rgba(0,255,0,0.7)]">
+            {countdown}
+          </div>
+        </div>
+      )}
+
+      {/* Done display */}
+      {isDone && !isAllStepsComplete && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="text-9xl font-bold text-blue-500 drop-shadow-[0_0_30px_rgba(0,100,255,0.7)]">
+            done
+          </div>
+        </div>
+      )}
+
+      {/* All steps complete display */}
+      {isAllStepsComplete && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="text-8xl font-bold text-green-500 drop-shadow-[0_0_30px_rgba(0,255,0,0.7)]">
+            alle stappen zijn klaar
+          </div>
+        </div>
+      )}
     </div>
   );
 }

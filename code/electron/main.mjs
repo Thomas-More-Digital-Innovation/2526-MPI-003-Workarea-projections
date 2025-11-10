@@ -7,44 +7,59 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// ✅ Correct database path (../data/app.db relative to dist)
 const dbPath = path.join(__dirname, '../data/app.db');
+if (!fs.existsSync(path.dirname(dbPath))) {
+  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+}
+
 const db = new Database(dbPath);
 
-// Maak tabellen aan volgens ERD
-db.prepare(`CREATE TABLE IF NOT EXISTS GridLayout (
-  gridLayoutId INTEGER PRIMARY KEY AUTOINCREMENT,
-  amount INTEGER NOT NULL,
-  shape TEXT NOT NULL,
-  size TEXT NOT NULL
-)`).run();
+// ✅ Create tables safely
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS GridLayout (
+    gridLayoutId INTEGER PRIMARY KEY AUTOINCREMENT,
+    amount INTEGER NOT NULL,
+    shape TEXT NOT NULL,
+    size TEXT NOT NULL
+  )
+`).run();
 
-db.prepare(`CREATE TABLE IF NOT EXISTS Preset (
-  presetId INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  description TEXT NOT NULL
-)`).run();
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS Preset (
+    presetId INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL
+  )
+`).run();
 
-db.prepare(`CREATE TABLE IF NOT EXISTS Image (
-  imageId INTEGER PRIMARY KEY AUTOINCREMENT,
-  path TEXT NOT NULL,
-  description TEXT NOT NULL
-)`).run();
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS Image (
+    imageId INTEGER PRIMARY KEY AUTOINCREMENT,
+    path TEXT NOT NULL,
+    description TEXT NOT NULL
+  )
+`).run();
 
-db.prepare(`CREATE TABLE IF NOT EXISTS Step (
-  stepId INTEGER PRIMARY KEY AUTOINCREMENT,
-  step INTEGER NOT NULL,
-  imageId INTEGER NOT NULL,
-  gridLayoutId INTEGER,
-  presetId INTEGER,
-  FOREIGN KEY (imageId) REFERENCES Image(imageId),
-  FOREIGN KEY (gridLayoutId) REFERENCES GridLayout(gridLayoutId),
-  FOREIGN KEY (presetId) REFERENCES Preset(presetId)
-)`).run();
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS Step (
+    stepId INTEGER PRIMARY KEY AUTOINCREMENT,
+    step INTEGER NOT NULL,
+    imageId INTEGER,
+    gridLayoutId INTEGER,
+    presetId INTEGER,
+    FOREIGN KEY (imageId) REFERENCES Image(imageId),
+    FOREIGN KEY (gridLayoutId) REFERENCES GridLayout(gridLayoutId),
+    FOREIGN KEY (presetId) REFERENCES Preset(presetId)
+  )
+`).run();
 
-// Voeg voorbeelddata toe als de tabellen leeg zijn
+// ✅ Insert sample data (fixed missing variable 'insert')
 if (db.prepare('SELECT COUNT(*) AS count FROM GridLayout').get().count === 0) {
-  db.prepare('INSERT INTO GridLayout (amount, shape, size) VALUES (?, ?, ?)')
-    .run(12, 'rectangle', 'medium');
+  const insert = db.prepare('INSERT INTO GridLayout (amount, shape, size) VALUES (?, ?, ?)');
+  insert.run(6, 'rectangle', 'medium');
+  insert.run(3, 'rectangle', 'medium');
 }
 
 if (db.prepare('SELECT COUNT(*) AS count FROM Preset').get().count === 0) {
@@ -52,7 +67,15 @@ if (db.prepare('SELECT COUNT(*) AS count FROM Preset').get().count === 0) {
     .run('Voorbeeld Preset', 'Dit is een voorbeeldpreset');
 }
 
-// IPC handlers voor Image CRUD
+if (db.prepare('SELECT COUNT(*) AS count FROM Step').get().count === 0) {
+  const insert = db.prepare('INSERT INTO Step (step, gridLayoutId, presetId) VALUES (?, ?, ?)');
+  insert.run(1, 1, 1);
+  insert.run(2, 2, 1);
+}
+
+//
+// 🧱 IMAGE CRUD
+//
 ipcMain.handle('images:getAll', () => {
   return db.prepare('SELECT * FROM Image').all();
 });
@@ -64,69 +87,42 @@ ipcMain.handle('images:add', (event, { path, description }) => {
 });
 
 ipcMain.handle('images:delete', (event, imageId) => {
-  // Find image row first
   const img = db.prepare('SELECT * FROM Image WHERE imageId = ?').get(imageId);
-  if (!img) {
-    return { success: false, error: 'Image not found' };
-  }
+  if (!img) return { success: false, error: 'Image not found' };
 
-  // Remove any Steps that reference this image to avoid foreign key constraint errors
   try {
     db.prepare('DELETE FROM Step WHERE imageId = ?').run(imageId);
-  } catch (err) {
-    console.error('Failed to delete referencing Steps for image', imageId, err);
-    // proceed — we'll still attempt to delete the image row
-  }
-
-  // Delete the image row from the database
-  try {
     db.prepare('DELETE FROM Image WHERE imageId = ?').run(imageId);
-  } catch (err) {
-    console.error('Failed to delete Image row', imageId, err);
-    return { success: false, error: 'Failed to delete image row' };
-  }
 
-  // Attempt to delete the physical file from the public directory
-  try {
-    // img.path is stored like 'images/filename.ext'
     const resolved = path.resolve(__dirname, '..', img.path);
     const publicDir = path.resolve(__dirname, '..', 'public');
-    // Safety: ensure the file lies inside the public directory
-    if (resolved.startsWith(publicDir)) {
-      if (fs.existsSync(resolved)) {
-        fs.unlinkSync(resolved);
-      } else {
-        // file already missing — not a fatal error
-        console.warn('Image file not found when attempting unlink:', resolved);
-      }
-    } else {
-      console.warn('Refusing to delete file outside public dir:', resolved);
+    if (resolved.startsWith(publicDir) && fs.existsSync(resolved)) {
+      fs.unlinkSync(resolved);
     }
+    return { success: true };
   } catch (err) {
-    console.error('Failed to remove image file from disk for imageId', imageId, err);
-    // not fatal for DB state — return success but include warning
-    return { success: true, warning: 'File delete failed' };
+    console.error('Failed to delete image', err);
+    return { success: false, error: err.message };
   }
-
-  return { success: true };
 });
 
-// IPC handler for adding image file from frontend
 ipcMain.handle('images:addFile', async (event, file, description) => {
-  // file: { name, buffer (Uint8Array) }
   const imagesDir = path.join(__dirname, '../public/images');
-  if (!fs.existsSync(imagesDir)) {
-    fs.mkdirSync(imagesDir, { recursive: true });
-  }
+  if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true });
+
   const filePath = path.join(imagesDir, file.name);
   fs.writeFileSync(filePath, Buffer.from(file.buffer));
+
   const relPath = `images/${file.name}`;
   const stmt = db.prepare('INSERT INTO Image (path, description) VALUES (?, ?)');
   const info = stmt.run(relPath, description);
+
   return { imageId: info.lastInsertRowid, path: relPath, description };
 });
 
-// IPC handlers voor GridLayout CRUD:
+//
+// 🧩 GRIDLAYOUT CRUD
+//
 ipcMain.handle('gridlayout:add', (event, { shape, size, amount }) => {
   const stmt = db.prepare('INSERT INTO GridLayout (amount, shape, size) VALUES (?, ?, ?)');
   const info = stmt.run(amount, shape, size);
@@ -137,6 +133,11 @@ ipcMain.handle('gridlayout:getAll', () => {
   return db.prepare('SELECT * FROM GridLayout').all();
 });
 
+// ✅ Added missing get-by-ID handler
+ipcMain.handle('gridlayout:getById', (event, gridLayoutId) => {
+  return db.prepare('SELECT * FROM GridLayout WHERE gridLayoutId = ?').get(gridLayoutId);
+});
+
 ipcMain.handle('gridlayout:update', (event, { gridLayoutId, shape, size, amount }) => {
   const stmt = db.prepare('UPDATE GridLayout SET amount = ?, shape = ?, size = ? WHERE gridLayoutId = ?');
   stmt.run(amount, shape, size, gridLayoutId);
@@ -144,18 +145,14 @@ ipcMain.handle('gridlayout:update', (event, { gridLayoutId, shape, size, amount 
 });
 
 ipcMain.handle('gridlayout:delete', (event, gridLayoutId) => {
-  // Remove any Steps that reference this gridLayout
-  try {
-    db.prepare('UPDATE Step SET gridLayoutId = NULL WHERE gridLayoutId = ?').run(gridLayoutId);
-  } catch (err) {
-    console.error('Failed to update Steps referencing gridLayoutId', gridLayoutId, err);
-  }
-  
+  db.prepare('UPDATE Step SET gridLayoutId = NULL WHERE gridLayoutId = ?').run(gridLayoutId);
   db.prepare('DELETE FROM GridLayout WHERE gridLayoutId = ?').run(gridLayoutId);
   return { success: true };
 });
 
-// IPC handlers voor Preset CRUD:
+//
+// 🧠 PRESET CRUD
+//
 ipcMain.handle('preset:add', (event, { name, description }) => {
   const stmt = db.prepare('INSERT INTO Preset (name, description) VALUES (?, ?)');
   const info = stmt.run(name, description);
@@ -167,24 +164,18 @@ ipcMain.handle('preset:getAll', () => {
 });
 
 ipcMain.handle('preset:update', (event, { presetId, name, description }) => {
-  const stmt = db.prepare('UPDATE Preset SET name = ?, description = ? WHERE presetId = ?');
-  stmt.run(name, description, presetId);
+  db.prepare('UPDATE Preset SET name = ?, description = ? WHERE presetId = ?')
+    .run(name, description, presetId);
   return { presetId, name, description };
 });
 
 ipcMain.handle('preset:delete', (event, presetId) => {
-  // Remove any Steps that reference this preset
-  try {
-    db.prepare('UPDATE Step SET presetId = NULL WHERE presetId = ?').run(presetId);
-  } catch (err) {
-    console.error('Failed to update Steps referencing presetId', presetId, err);
-  }
-  
+  db.prepare('UPDATE Step SET presetId = NULL WHERE presetId = ?').run(presetId);
   db.prepare('DELETE FROM Preset WHERE presetId = ?').run(presetId);
   return { success: true };
 });
 
-// Combined query to get presets with their gridlayout information
+// ✅ Combined Preset + GridLayout query
 ipcMain.handle('preset:getWithGridLayouts', () => {
   const query = `
     SELECT 
@@ -203,7 +194,9 @@ ipcMain.handle('preset:getWithGridLayouts', () => {
   return db.prepare(query).all();
 });
 
-// IPC handlers voor Step CRUD:
+//
+// 🪜 STEP CRUD
+//
 ipcMain.handle('step:add', (event, { step, imageId, gridLayoutId, presetId }) => {
   const stmt = db.prepare('INSERT INTO Step (step, imageId, gridLayoutId, presetId) VALUES (?, ?, ?, ?)');
   const info = stmt.run(step, imageId, gridLayoutId || null, presetId || null);
@@ -229,14 +222,16 @@ ipcMain.handle('step:delete', (event, stepId) => {
   return { success: true };
 });
 
-
+//
+// ⚙️ ELECTRON WINDOW SETUP
+//
 function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 1920,
     height: 1080,
-    minWidth: 1920,   
-    minHeight: 1080,  
-    resizable: true,  
+    minWidth: 1920,
+    minHeight: 1080,
+    resizable: true,
     maximizable: true,
     minimizable: true,
     webPreferences: {
@@ -260,12 +255,13 @@ function createWindow() {
       })
     );
   }
-  
+
   return mainWindow;
 }
 
 app.whenReady().then(() => {
   const mainWindow = createWindow();
+
   globalShortcut.register('CommandOrControl+Shift+I', () => {
     if (mainWindow && mainWindow.webContents) {
       mainWindow.webContents.openDevTools();
