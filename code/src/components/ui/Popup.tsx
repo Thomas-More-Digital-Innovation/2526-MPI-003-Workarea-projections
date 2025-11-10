@@ -10,6 +10,12 @@ import GridPreset from "../grid/GridPreset";
 type PopupProps = {
   popupType: string;
   onClose?: () => void;
+  onSave?: (amount: number, shape: "circle" | "rectangle", size: "small" | "medium" | "large") => void;
+  initialValues?: {
+    amount: number;
+    shape: "circle" | "rectangle";
+    size: "small" | "medium" | "large";
+  };
 };
 
 const POPUP_TITLES: Record<string, string> = {
@@ -19,7 +25,7 @@ const POPUP_TITLES: Record<string, string> = {
   gridPreset: "Grid Toevoegen",
 };
 
-const Popup = ({ popupType, onClose }: PopupProps) => {
+const Popup = ({ popupType, onClose, onSave, initialValues }: PopupProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [hoveredBox, setHoveredBox] = React.useState<'export' | 'import' | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -292,7 +298,7 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
 
         {popupType === "gridPreset" && (
           <div>
-            <div>
+            <div className="space-y-6">
               <div className="flex flex-row gap-6 mx-auto">
                 <InputField
                   type="textField"
@@ -317,16 +323,15 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
                 />
               </div>
 
-            </div>
-            <div className="mx-auto">
-              <div className="my-2 flex flex-row gap-6 max-w-5xl mx-auto">
-                <p className="text-sm font-bold text-[var(--color-primary)]">Voorbeeld:</p>
+              <div className="mx-auto">
+                <div className="my-2 flex flex-row gap-6 max-w-5xl mx-auto">
+                  <p className="text-sm font-bold text-[var(--color-primary)]">Voorbeeld:</p>
+                </div>
+                <div className="w-full h-65 border border-gray-300 rounded-lg bg-white flex items-center justify-center">
+                  <GridPreset shape={shape} size={size} scale={0.3} total={Number.parseInt(amount || '0', 10)} />
+                </div>
               </div>
-              <div className="w-full h-65 border border-gray-300 rounded-lg bg-white flex items-center justify-center">
-                <GridPreset shape={shape} size={size} scale={0.3} total={Number.parseInt(amount || '0', 10)} />
-              </div>
             </div>
-
           </div>
         )}
 
@@ -407,6 +412,28 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
             </div>
           )}
 
+          {popupType === "gridPreset" && (
+            <div className="flex justify-between space-x-6 items-center">
+              <div className="w-[282px]">
+                <Button type="secondary" text="Terug" onClick={onClose} />
+              </div>
+              <div className="w-[282px]">
+                <Button 
+                  type="primary" 
+                  text="Opslaan" 
+                  onClick={() => {
+                    const parsedAmount = parseInt(amount, 10);
+                    if (!isNaN(parsedAmount) && parsedAmount > 0 && onSave) {
+                      onSave(parsedAmount, shape, size);
+                    } else if (isNaN(parsedAmount) || parsedAmount <= 0) {
+                      alert("Voer een geldig aantal in (groter dan 0)");
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           {popupType === "exportImport" && (
             <div className="flex justify-center">
               <div className="w-[282px]">
@@ -418,7 +445,7 @@ const Popup = ({ popupType, onClose }: PopupProps) => {
           {popupType === "imageUpload" && (
             <div className="flex justify-between items-center">
               <div className="w-[282px]">
-                <Button type="secondary" text="Annuleren" onClick={onClose} />
+                <Button type="secondary" text="Terug" onClick={onClose} />
               </div>
               <div className="w-[282px]">
                 <Button type="primary" text="Opslaan" onClick={handleSave} />

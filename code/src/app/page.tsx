@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Navbar, Button, Popup, GridCard, Footer } from "@/components";
+import { Navbar, Button, Popup, GridCard, Footer, Toast } from "@/components";
 import { Link } from "lucide-react";
 import { useRouter } from "next/navigation";
 import preset from "./preset/page";
@@ -16,12 +16,24 @@ export default function Home() {
   const [showPopup, setShowPopup] = useState(false);
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
   const [presets, setPresets] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" | "warning" } | null>(null);
   const router = useRouter();
+
+  const showToast = (message: string, type: "success" | "error" | "info" | "warning" = "info") => {
+    setToast({ message, type });
+  };
 
   const handleSelect = (id: string | number) => {
     const num = Number(id);
     setSelectedCard((prev) => (prev === num ? null : num));
   };
+
+  // Filter presets based on search query
+  const filteredPresets = presets.filter(preset => 
+    preset.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    preset.description.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   useEffect(() => {
     const loadPresets = async () => {
@@ -45,7 +57,7 @@ export default function Home() {
 
   async function handleStart() {
     if (selectedCard === null) {
-      alert("Please select a preset first");
+      showToast("Selecteer eerst een preset", "warning");
       return;
     }
 
@@ -60,7 +72,7 @@ export default function Home() {
       console.log("Selected preset:", selectedPreset);
       
       if (!selectedPreset) {
-        alert("Selected preset not found");
+        showToast("Geselecteerde preset niet gevonden", "error");
         return;
       }
 
@@ -80,14 +92,14 @@ export default function Home() {
         console.log("Steps for preset:", steps);
 
         if (!steps || steps.length === 0) {
-          alert("No steps found for this preset");
+          showToast("Geen stappen gevonden voor deze preset", "error");
           return;
         }
 
         const firstStep = steps[0];
         
         if (!firstStep.gridLayoutId) {
-          alert("First step has no grid layout");
+          showToast("Eerste stap heeft geen grid layout", "error");
           return;
         }
 
@@ -98,64 +110,95 @@ export default function Home() {
       } else {
         console.error("❌ getStepsByPresetId not found on electronAPI");
         console.log("Available methods:", Object.keys(api || {}));
-        alert("Cannot load preset steps - API method not available");
+        showToast("Kan preset stappen niet laden - API methode niet beschikbaar", "error");
       }
       
     } catch (err) {
       console.error("❌ Failed to load preset steps", err);
       console.error("Error details:", err);
-      alert(`Error loading preset configuration: ${err}`);
+      showToast(`Fout bij laden preset configuratie: ${err}`, "error");
     }
   }
 
   return (
-    <div className="p-4 min-h-screen bg-[var(--color-secondary)]/20 flex flex-col justify-between gap-4">
-      <Navbar />
+    <div className="h-screen bg-[var(--color-secondary)]/20 flex flex-col">
+      <div className="p-4 pb-0 flex-shrink-0">
+        <Navbar searchQuery={searchQuery} onSearchChange={setSearchQuery} />
+      </div>
 
-      <main
-        id="Presets"
-        className="bg-white shadow-md px-3 py-3 flex justify-between rounded-2xl w-full flex-1"
-      >
-        <div className="grid grid-cols-6 gap-6">
-          {presets.length > 0 ? (
-            presets.map((p) => (
-              <GridCard
-                key={p.presetId}
-                id={p.presetId}
-                title={p.name}
-                description={p.description}
-                preset={p.gridLayoutId ? p : undefined}
-                active={selectedCard === p.presetId}
-                onSelect={handleSelect}
-              />
-            ))
+      <main className="bg-white shadow-md rounded-2xl me-4 mt-4 ml-4 flex flex-1 min-h-0">
+        {/* Scrollable content wrapper */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-4">
+          {filteredPresets.length > 0 ? (
+            <div className="flex flex-wrap gap-6">
+              {filteredPresets.map((p) => (
+                <GridCard
+                  key={p.presetId}
+                  id={p.presetId}
+                  title={p.name}
+                  description={p.description}
+                  preset={p.gridLayoutId ? p : undefined}
+                  active={selectedCard === p.presetId}
+                  onSelect={handleSelect}
+                />
+              ))}
+            </div>
+          ) : presets.length > 0 ? (
+            <div className="flex flex-1 items-center justify-center h-full">
+              <div className="p-8 rounded-2xl text-center">
+                <p className="text-lg font-semibold">Geen presets gevonden voor "{searchQuery}"</p>
+                <p className="text-sm text-[var(--color-text)] mt-2">
+                  Probeer een andere zoekterm.
+                </p>
+              </div>
+            </div>
           ) : (
-            <div className="col-span-6 p-8 rounded-2xl bg-[var(--color-popup)] text-center">
-              <p className="text-lg font-semibold">Geen presets gevonden</p>
-              <p className="text-sm text-[var(--color-text)] mt-2">
-                Voeg een nieuw grid toe met de knop hierboven.
-              </p>
+            <div className="flex flex-1 items-center justify-center h-full">
+              <div className="p-8 rounded-2xl text-center">
+                <p className="text-lg font-semibold">Geen presets gevonden</p>
+                <p className="text-sm text-[var(--color-text)] mt-2">
+                  Voeg een nieuw grid toe met de knop hierboven.
+                </p>
+              </div>
             </div>
           )}
         </div>
       </main>
 
-      <Footer>
-        <Button
-          type="secondary"
-          text={"Bewerken"}
-          onClick={() => {}}
-          fullWidth={false}
-          fixedWidth={true}
+
+      <div className="p-4">
+        <Footer>
+          <Button
+            type="secondary"
+            text={"Bewerken"}
+            onClick={() => {
+              if (selectedCard === null) {
+                showToast("Selecteer eerst een preset", "warning");
+                return;
+              }
+              router.push(`/preset?id=${selectedCard}`);
+            }}
+            fullWidth={false}
+            fixedWidth={true}
+          />
+          <Button
+            type="primary"
+            text={"Start"}
+            onClick={handleStart}
+            fullWidth={false}
+            fixedWidth={true}
+          />
+        </Footer>
+      </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
         />
-        <Button
-          type="primary"
-          text={"Start"}
-          onClick={handleStart}
-          fullWidth={false}
-          fixedWidth={true}
-        />
-      </Footer>
+      )}
     </div>
   );
 }
