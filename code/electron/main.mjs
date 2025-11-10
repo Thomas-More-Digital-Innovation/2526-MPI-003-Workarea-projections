@@ -58,8 +58,8 @@ db.prepare(`
 // ✅ Insert sample data (fixed missing variable 'insert')
 if (db.prepare('SELECT COUNT(*) AS count FROM GridLayout').get().count === 0) {
   const insert = db.prepare('INSERT INTO GridLayout (amount, shape, size) VALUES (?, ?, ?)');
-  insert.run(6, 'rectangle', 'medium');
-  insert.run(3, 'rectangle', 'medium');
+  insert.run(6, 'circle', 'medium');
+  insert.run(3, 'circle', 'medium');
 }
 
 if (db.prepare('SELECT COUNT(*) AS count FROM Preset').get().count === 0) {
