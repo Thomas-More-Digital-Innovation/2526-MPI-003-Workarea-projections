@@ -6,7 +6,7 @@ import { InputField } from "@/components";
 import { useRouter } from "next/navigation";
 import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import GridPreset from "@/components/grid/GridPreset";
-import { PencilIcon, TrashIcon, ArrowDownIcon, DocumentDuplicateIcon } from "@heroicons/react/24/outline";
+import { PencilIcon, TrashIcon, ArrowDownIcon, DocumentDuplicateIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
 interface GridLayoutData {
   id: string;
@@ -16,18 +16,32 @@ interface GridLayoutData {
   step: number;
 }
 
+interface ImageData {
+  id: string;
+  imageId: number;
+  path: string;
+  description: string;
+  step: number;
+}
+
+type StepItem = 
+  | { type: 'grid'; data: GridLayoutData }
+  | { type: 'image'; data: ImageData };
+
 export default function PresetToevoegen() {
   const [showPopupGridToevoegen, setShowPopupGridToevoegen] = useState(false);
   const [showPopupGridEdit, setShowPopupGridEdit] = useState(false);
   const [presetName, setPresetName] = useState("");
   const [presetDescription, setPresetDescription] = useState("");
-  const [gridLayouts, setGridLayouts] = useState<GridLayoutData[]>([]);
+  const [steps, setSteps] = useState<StepItem[]>([]);
   const [editingGrid, setEditingGrid] = useState<GridLayoutData | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [editingPresetId, setEditingPresetId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" | "warning" } | null>(null);
   const [openMenuIndex, setOpenMenuIndex] = useState<number | null>(null);
+  const [showPopupImage, setShowPopupImage] = useState(false);
+  const [availableImages, setAvailableImages] = useState<Array<{ imageId: number; path: string; description: string }>>([]);
   const router = useRouter();
 
   const showToast = (message: string, type: "success" | "error" | "info" | "warning" = "info") => {
@@ -66,30 +80,49 @@ export default function PresetToevoegen() {
         setPresetDescription(preset.description || "");
 
         // Load steps for this preset
-        const steps = await api.getStepsByPreset(preset.presetId);
+        const stepsData = await api.getStepsByPreset(preset.presetId);
         
-        // Load grid layouts for each step
-        const gridLayoutsData: GridLayoutData[] = [];
-        for (const step of steps) {
+        // Load grid layouts and images for each step
+        const stepItems: StepItem[] = [];
+        for (const step of stepsData) {
           if (step.gridLayoutId) {
             const gridLayouts = await api.getGridLayouts();
             const gridLayout = gridLayouts.find((gl: any) => gl.gridLayoutId === step.gridLayoutId);
             
             if (gridLayout) {
-              gridLayoutsData.push({
-                id: `grid-${step.stepId}`,
-                amount: gridLayout.amount,
-                shape: gridLayout.shape,
-                size: gridLayout.size,
-                step: step.step,
+              stepItems.push({
+                type: 'grid',
+                data: {
+                  id: `grid-${step.stepId}`,
+                  amount: gridLayout.amount,
+                  shape: gridLayout.shape,
+                  size: gridLayout.size,
+                  step: step.step,
+                }
+              });
+            }
+          } else if (step.imageId) {
+            const images = await api.getImages();
+            const image = images.find((img: any) => img.imageId === step.imageId);
+            
+            if (image) {
+              stepItems.push({
+                type: 'image',
+                data: {
+                  id: `image-${step.stepId}`,
+                  imageId: image.imageId,
+                  path: image.path,
+                  description: image.description,
+                  step: step.step,
+                }
               });
             }
           }
         }
 
         // Sort by step number
-        gridLayoutsData.sort((a, b) => a.step - b.step);
-        setGridLayouts(gridLayoutsData);
+        stepItems.sort((a, b) => a.data.step - b.data.step);
+        setSteps(stepItems);
       } catch (error) {
         console.error("Error loading preset:", error);
         showToast("Fout bij laden preset", "error");
@@ -101,56 +134,119 @@ export default function PresetToevoegen() {
     loadPresetData();
   }, [router]);
 
+  // Load available images
+  useEffect(() => {
+    const loadImages = async () => {
+      try {
+        const api = (globalThis as any)?.electronAPI;
+        if (!api) return;
+        
+        const images = await api.getImages();
+        setAvailableImages(images || []);
+      } catch (error) {
+        console.error("Error loading images:", error);
+      }
+    };
+    
+    loadImages();
+  }, [showPopupImage]);
+
   const handleAddGrid = (amount: number, shape: "circle" | "rectangle", size: "small" | "medium" | "large") => {
     const newGrid: GridLayoutData = {
       id: `grid-${Date.now()}`,
       amount,
       shape,
       size,
-      step: gridLayouts.length + 1,
+      step: steps.length + 1,
     };
-    setGridLayouts([...gridLayouts, newGrid]);
+    setSteps([...steps, { type: 'grid', data: newGrid }]);
     setShowPopupGridToevoegen(false);
   };
 
-  const handleCopyGrid = (index: number) => {
-    const gridToCopy = gridLayouts[index];
-    const copiedGrid: GridLayoutData = {
-      ...gridToCopy,
-      id: `grid-${Date.now()}`,
-      step: gridLayouts.length + 1,
+  const handleAddImage = (imageId: number) => {
+    const selectedImage = availableImages.find(img => img.imageId === imageId);
+    if (!selectedImage) return;
+
+    const newImage: ImageData = {
+      id: `image-${Date.now()}`,
+      imageId: selectedImage.imageId,
+      path: selectedImage.path,
+      description: selectedImage.description,
+      step: steps.length + 1,
     };
-    setGridLayouts([...gridLayouts, copiedGrid]);
+    setSteps([...steps, { type: 'image', data: newImage }]);
+    setShowPopupImage(false);
   };
 
-  const handleEditGrid = (index: number) => {
-    setEditingGrid({ ...gridLayouts[index], step: index });
-    setShowPopupGridEdit(true);
+  const handleCopy = (index: number) => {
+    const itemToCopy = steps[index];
+    if (itemToCopy.type === 'grid') {
+      const copiedGrid: GridLayoutData = {
+        ...itemToCopy.data,
+        id: `grid-${Date.now()}`,
+        step: steps.length + 1,
+      };
+      setSteps([...steps, { type: 'grid', data: copiedGrid }]);
+    } else {
+      const copiedImage: ImageData = {
+        ...itemToCopy.data,
+        id: `image-${Date.now()}`,
+        step: steps.length + 1,
+      };
+      setSteps([...steps, { type: 'image', data: copiedImage }]);
+    }
+  };
+
+  const handleEdit = (index: number) => {
+    const item = steps[index];
+    if (item.type === 'grid') {
+      setEditingGrid({ ...item.data, step: index });
+      setShowPopupGridEdit(true);
+    }
+    // Images cannot be edited, only replaced
   };
 
   const handleUpdateGrid = (amount: number, shape: "circle" | "rectangle", size: "small" | "medium" | "large") => {
     if (editingGrid) {
-      const updatedGrids = [...gridLayouts];
-      updatedGrids[editingGrid.step] = {
-        ...updatedGrids[editingGrid.step],
-        amount,
-        shape,
-        size,
+      const updatedSteps = [...steps];
+      updatedSteps[editingGrid.step] = {
+        type: 'grid',
+        data: {
+          ...updatedSteps[editingGrid.step].data as GridLayoutData,
+          amount,
+          shape,
+          size,
+        }
       };
-      setGridLayouts(updatedGrids);
+      setSteps(updatedSteps);
       setShowPopupGridEdit(false);
       setEditingGrid(null);
     }
   };
 
-  const handleDeleteGrid = (index: number) => {
-    const updatedGrids = gridLayouts.filter((_, i) => i !== index);
+  const handleDelete = (index: number) => {
+    const updatedSteps = steps.filter((_, i) => i !== index);
     // Renumber steps
-    const renumberedGrids = updatedGrids.map((grid, i) => ({
-      ...grid,
-      step: i + 1,
-    }));
-    setGridLayouts(renumberedGrids);
+    const renumberedSteps = updatedSteps.map((item, i): StepItem => {
+      if (item.type === 'grid') {
+        return {
+          type: 'grid',
+          data: {
+            ...item.data,
+            step: i + 1,
+          }
+        };
+      } else {
+        return {
+          type: 'image',
+          data: {
+            ...item.data,
+            step: i + 1,
+          }
+        };
+      }
+    });
+    setSteps(renumberedSteps);
   };
 
   const handleDragStart = (index: number) => {
@@ -161,18 +257,33 @@ export default function PresetToevoegen() {
     e.preventDefault();
     if (draggedIndex === null || draggedIndex === index) return;
 
-    const updatedGrids = [...gridLayouts];
-    const draggedItem = updatedGrids[draggedIndex];
-    updatedGrids.splice(draggedIndex, 1);
-    updatedGrids.splice(index, 0, draggedItem);
+    const updatedSteps = [...steps];
+    const draggedItem = updatedSteps[draggedIndex];
+    updatedSteps.splice(draggedIndex, 1);
+    updatedSteps.splice(index, 0, draggedItem);
 
     // Renumber steps
-    const renumberedGrids = updatedGrids.map((grid, i) => ({
-      ...grid,
-      step: i + 1,
-    }));
+    const renumberedSteps = updatedSteps.map((item, i): StepItem => {
+      if (item.type === 'grid') {
+        return {
+          type: 'grid',
+          data: {
+            ...item.data,
+            step: i + 1,
+          }
+        };
+      } else {
+        return {
+          type: 'image',
+          data: {
+            ...item.data,
+            step: i + 1,
+          }
+        };
+      }
+    });
 
-    setGridLayouts(renumberedGrids);
+    setSteps(renumberedSteps);
     setDraggedIndex(index);
   };
 
@@ -180,7 +291,7 @@ export default function PresetToevoegen() {
     setDraggedIndex(null);
   };
 
-  const handleDelete = async () => {
+  const handleDeletePreset = async () => {
     if (!editingPresetId) return;
 
     // Confirm deletion
@@ -223,8 +334,8 @@ export default function PresetToevoegen() {
       return;
     }
 
-    if (gridLayouts.length === 0) {
-      showToast("Voeg minstens één grid toe", "warning");
+    if (steps.length === 0) {
+      showToast("Voeg minstens één grid of foto toe", "warning");
       return;
     }
 
@@ -264,28 +375,38 @@ export default function PresetToevoegen() {
         presetId = presetResult.presetId;
       }
 
-      // Create each grid layout and its step
-      for (const grid of gridLayouts) {
-        // Create the grid layout
-        const gridResult = await api.addGridLayout({
-          amount: grid.amount,
-          shape: grid.shape,
-          size: grid.size,
-        });
+      // Create each step (grid or image)
+      for (const item of steps) {
+        if (item.type === 'grid') {
+          // Create the grid layout
+          const gridResult = await api.addGridLayout({
+            amount: item.data.amount,
+            shape: item.data.shape,
+            size: item.data.size,
+          });
 
-        if (!gridResult || !gridResult.gridLayoutId) {
-          throw new Error("Failed to create grid layout");
+          if (!gridResult || !gridResult.gridLayoutId) {
+            throw new Error("Failed to create grid layout");
+          }
+
+          const gridLayoutId = gridResult.gridLayoutId;
+
+          // Create the step linking the grid to the preset
+          await api.addStep({
+            step: item.data.step,
+            imageId: null,
+            gridLayoutId: gridLayoutId,
+            presetId: presetId,
+          });
+        } else {
+          // Create the step linking the image to the preset
+          await api.addStep({
+            step: item.data.step,
+            imageId: item.data.imageId,
+            gridLayoutId: null,
+            presetId: presetId,
+          });
         }
-
-        const gridLayoutId = gridResult.gridLayoutId;
-
-        // Create the step linking the grid to the preset
-        await api.addStep({
-          step: grid.step,
-          imageId: null,
-          gridLayoutId: gridLayoutId,
-          presetId: presetId,
-        });
       }
 
       showToast(editingPresetId ? "Preset succesvol bijgewerkt!" : "Preset succesvol opgeslagen!", "success");
@@ -333,13 +454,13 @@ export default function PresetToevoegen() {
       ) : (
       <main className="bg-white shadow-md px-6 py-6 rounded-2xl mx-4 my-4 flex-1 min-h-0 flex flex-col gap-6 overflow-y-auto">
 
-        {/* Grid Layouts Section */}
+        {/* Steps Section */}
         <div className="flex flex-col gap-4 w-full items-center">
-          {/* Grid List */}
+          {/* Steps List */}
           <div className="flex flex-col gap-4 w-full">
-            {gridLayouts.map((grid, index) => (
+            {steps.map((item, index) => (
               <div
-                key={grid.id}
+                key={item.data.id}
                 draggable
                 onDragStart={() => handleDragStart(index)}
                 onDragOver={(e) => handleDragOver(e, index)}
@@ -349,31 +470,49 @@ export default function PresetToevoegen() {
                 }`}
               >
                 <div className="flex flex-row gap-4 items-center justify-center">
-                  {/* Grid Preview - Fixed Size */}
+                  {/* Preview - Fixed Size */}
                   <div className="w-40 aspect-video bg-white p-4 rounded-lg flex items-center justify-center">
-                    <GridPreset
-                      shape={grid.shape}
-                      size={grid.size}
-                      scale={0.05}
-                      total={grid.amount}
-                      pagination={false}
-                    />
+                    {item.type === 'grid' ? (
+                      <GridPreset
+                        shape={item.data.shape}
+                        size={item.data.size}
+                        scale={0.05}
+                        total={item.data.amount}
+                        pagination={false}
+                      />
+                    ) : (
+                      <img
+                        src={`/${item.data.path}`}
+                        alt={item.data.description || 'Image'}
+                        className="w-full h-full object-contain object-center"
+                      />
+                    )}
                   </div>
                 
-                  {/* Grid Info - Closer together and centered */}
+                  {/* Info - Closer together and centered */}
                   <div className="flex gap-8 text-center text-sm text-[var(--color-text)]">
-                    <p><strong>Aantal:</strong> {grid.amount}</p>
-                    <p><strong>Vorm:</strong> {grid.shape === "circle" ? "Cirkel" : "Rechthoek"}</p>
-                    <p>
-                      <strong>Grootte:</strong>{" "}
-                      {grid.size === "small" ? "Klein" : grid.size === "medium" ? "Middelgroot" : "Groot"}
-                    </p>
+                    {item.type === 'grid' ? (
+                      <>
+                        <p><strong>Type:</strong> Grid</p>
+                        <p><strong>Aantal:</strong> {item.data.amount}</p>
+                        <p><strong>Vorm:</strong> {item.data.shape === "circle" ? "Cirkel" : "Rechthoek"}</p>
+                        <p>
+                          <strong>Grootte:</strong>{" "}
+                          {item.data.size === "small" ? "Klein" : item.data.size === "medium" ? "Middelgroot" : "Groot"}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p><strong>Type:</strong> Foto</p>
+                        <p><strong>Beschrijving:</strong> {item.data.description || 'Geen beschrijving'}</p>
+                      </>
+                    )}
                   </div>
                 </div>
               
                 {/* Action Buttons */}
                 <div className="flex gap-2 justify-center relative">
-                  {/* Three-dot menu with dropdown (without copy button) */}
+                  {/* Three-dot menu with dropdown */}
                   <div className="relative">
                     <button
                       onClick={() => setOpenMenuIndex(openMenuIndex === index ? null : index)}
@@ -393,19 +532,21 @@ export default function PresetToevoegen() {
                         />
                         
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-20 border border-gray-200">
+                          {item.type === 'grid' && (
+                            <button
+                              onClick={() => {
+                                handleEdit(index);
+                                setOpenMenuIndex(null);
+                              }}
+                              className="w-full text-left px-4 py-2 hover:bg-gray-100 rounded-t-lg flex items-center gap-2"
+                            >
+                              <PencilIcon className="w-4 h-4" />
+                              Bewerken
+                            </button>
+                          )}
                           <button
                             onClick={() => {
-                              handleEditGrid(index);
-                              setOpenMenuIndex(null);
-                            }}
-                            className="w-full text-left px-4 py-2 hover:bg-gray-100 rounded-t-lg flex items-center gap-2"
-                          >
-                            <PencilIcon className="w-4 h-4" />
-                            Opslaan
-                          </button>
-                          <button
-                            onClick={() => {
-                              handleDeleteGrid(index);
+                              handleDelete(index);
                               setOpenMenuIndex(null);
                             }}
                             className="w-full text-left px-4 py-2 hover:bg-gray-100 rounded-b-lg text-red-600 flex items-center gap-2"
@@ -422,10 +563,10 @@ export default function PresetToevoegen() {
             ))}
           </div>
 
-          {gridLayouts.length === 0 && (
+          {steps.length === 0 && (
             <div className="text-center py-8 text-gray-400">
-              <p className="text-xl">Geen grids toegevoegd</p>
-              <p className="text-md mt-2">Klik op "Grid toevoegen" om te beginnen</p>
+              <p className="text-xl">Geen stappen toegevoegd</p>
+              <p className="text-md mt-2">Klik op \"Grid toevoegen\" of \"Foto toevoegen\" om te beginnen</p>
             </div>
           )}
 
@@ -443,15 +584,16 @@ export default function PresetToevoegen() {
             text="Kopie"
             bgColorClass="bg-[#FCFFE6]"
             onClick={() => {
-              if (gridLayouts.length > 0) {
-                handleCopyGrid(gridLayouts.length - 1);
+              if (steps.length > 0) {
+                handleCopy(steps.length - 1);
               }
             }}
-            disabled={gridLayouts.length === 0}
+            disabled={steps.length === 0}
           />
           <Button 
             type="lines" 
             text="Foto toevoegen" 
+            onClick={() => setShowPopupImage(true)}
           />
         </div>
         </div>
@@ -465,7 +607,7 @@ export default function PresetToevoegen() {
             <Button 
               type="secondary"
               text="Verwijderen" 
-              onClick={handleDelete} 
+              onClick={handleDeletePreset} 
               fullWidth={false} 
               fixedWidth={true}
             />
@@ -488,6 +630,47 @@ export default function PresetToevoegen() {
             onClose={() => setShowPopupGridToevoegen(false)}
             onSave={handleAddGrid}
           />
+        </div>
+      )}
+
+      {showPopupImage && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+          <div className="p-4 bg-[var(--color-popup)] rounded-2xl shadow relative max-w-[609px] w-[80%] md:w-[40%]">
+            <button className="absolute top-4 right-3" onClick={() => setShowPopupImage(false)}>
+              <XMarkIcon className="h-8 w-8 text-[var(--dark-text)] cursor-pointer" />
+            </button>
+            <div>
+              <h2 className="text-3xl font-bold text-center text-[var(--dark-text)] mb-4">Selecteer een foto</h2>
+              <hr className="w-full mb-4 border-1 rounded-2xl border-[#004248]/20" />
+              
+              <div className="grid gap-4 grid-cols-3 max-h-[60vh] overflow-y-auto p-2">
+                {availableImages.map((img) => (
+                  <div
+                    key={img.imageId}
+                    onClick={() => handleAddImage(img.imageId)}
+                    className="cursor-pointer rounded-2xl overflow-hidden shadow hover:shadow-lg transition-shadow aspect-square bg-white"
+                  >
+                    <img
+                      src={`/${img.path}`}
+                      alt={img.description || 'Image'}
+                      className="w-full h-full object-contain object-center"
+                    />
+                  </div>
+                ))}
+              </div>
+              
+              {availableImages.length === 0 && (
+                <div className="text-center py-8 text-gray-400">
+                  <p className="text-lg">Geen foto's beschikbaar</p>
+                  <p className="text-sm mt-2">Ga naar Foto Beheer om foto's toe te voegen</p>
+                </div>
+              )}
+              
+              <div className="w-full mt-4">
+                <Button type="secondary" text="Terug" onClick={() => setShowPopupImage(false)} />
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
