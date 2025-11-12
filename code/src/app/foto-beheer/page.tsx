@@ -118,7 +118,7 @@ export default function FotosBeheren() {
       </div>
 
       {/* Footer Buttons - over volle breedte */}
-      <div className="px-4 py-4">
+      <div className="p-4">
         <div className="w-full rounded-2xl shadow-md" style={{ backgroundColor: 'var(--color-white)' }}>
           <Footer>
             <Button text="Terug" type="primary" onClick={handleTerug} fullWidth={false} fixedWidth={true} />
@@ -144,7 +144,7 @@ export default function FotosBeheren() {
             {/* Header */}
             <div style={{ background: 'var(--color-popup)' }} className="px-6 py-4">
               <div className='pb-3'>
-                <h2 className="text-xl font-semibold text-[var(--dark-text)] text-center">Afbeelding verwijderen</h2>
+                <h2 className="text-xl font-semibold text-[var(--dark-text)] text-center">Foto verwijderen</h2>
               </div>
 
               <div className='border border-gray-400'></div>

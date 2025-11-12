@@ -23,7 +23,7 @@ const GridCard = ({ id, title, description, preset, active = false, onSelect }: 
     const handleClick = () => onSelect?.(id);
 
     return (
-        <button type="button" onClick={handleClick} className={`w-[282px] h-[348px] rounded-2xl shadow-lg p-4 flex flex-col text-left transition-colors ${active ? 'bg-[var(--color-primary)]/50 text-white' : 'bg-[var(--color-popup)] text-[var(--dark-text)]'}`}>
+        <button type="button" onClick={handleClick} className={`w-[286px] h-[340px] rounded-2xl shadow-lg p-4 flex flex-col text-left transition-colors ${active ? 'bg-[var(--color-primary)]/50 text-white' : 'bg-[var(--color-popup)] text-[var(--dark-text)]'}`}>
             {/* Image area */}
             <div className={`rounded-2xl w-full h-[50%] flex flex-col justify-center items-center p-4 bg-white`}>
                 <div className="w-full">

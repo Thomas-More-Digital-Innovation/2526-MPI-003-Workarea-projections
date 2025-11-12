@@ -10,7 +10,12 @@ import Popup from "../ui/Popup";
 import { useRouter } from "next/navigation";
 
 
-const Navbar: React.FC = () => {
+interface NavbarProps {
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
+}
+
+const Navbar: React.FC<NavbarProps> = ({ searchQuery = "", onSearchChange }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -40,6 +45,8 @@ const Navbar: React.FC = () => {
         <input
           type="text"
           placeholder="Zoeken..."
+          value={searchQuery}
+          onChange={(e) => onSearchChange?.(e.target.value)}
           className="w-full px-4 py-4 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
         />
       </div>
@@ -55,41 +62,6 @@ const Navbar: React.FC = () => {
           </Dropdown.Menu>
         </Dropdown>
       </div>
-
-      {/* Burger menu icon (visible on mobile only) */}
-      <button
-        className="md:hidden p-2 rounded focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-        onClick={() => setMobileMenuOpen((open) => !open)}
-        aria-label="Open menu"
-      >
-        {mobileMenuOpen ? (
-          <XMarkIcon className="h-8 w-8 text-[var(--color-primary)]" />
-        ) : (
-          <Bars3Icon className="h-8 w-8 text-[var(--color-primary)]" />
-        )}
-      </button>
-
-      {/* Mobile dropdown menu (not overlay) */}
-      {mobileMenuOpen && (
-        <div className="absolute left-0 right-0 top-full py-4 bg-white rounded-b-2xl shadow-lg z-40 flex flex-col items-center md:hidden animate-fadeIn">
-          <input
-            type="text"
-            placeholder="Zoeken..."
-            className="w-11/12 mb-4 mt-4 px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
-          />
-          <div className="w-11/12 mb-4">
-            <Button type="primary" onClick={() => router.push('/preset')} text="Toevoegen" />
-          </div>
-          <Dropdown>
-            <Dropdown.Button>Extra</Dropdown.Button>
-            <Dropdown.Menu>
-              <Dropdown.Item onClick={handleFotoBeheer}>Foto Beheer</Dropdown.Item>
-              <Dropdown.Item onClick={handlePresets}>Imp/Exp presets</Dropdown.Item>
-            </Dropdown.Menu>
-          </Dropdown>
-        </div>
-      )}
-
       {/* Popup overlay (always on top) */}
       {showPopup && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 bg-opacity-40 z-50">
