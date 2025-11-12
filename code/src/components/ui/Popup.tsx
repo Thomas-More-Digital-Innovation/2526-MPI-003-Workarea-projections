@@ -16,6 +16,8 @@ type PopupProps = {
     shape: "circle" | "rectangle";
     size: "small" | "medium" | "large";
   };
+  images?: { imageId: number; path: string }[];
+  onImageSelect?: (imageId: number) => void;
 };
 
 const POPUP_TITLES: Record<string, string> = {
@@ -25,7 +27,7 @@ const POPUP_TITLES: Record<string, string> = {
   gridPreset: "Grid Toevoegen",
 };
 
-const Popup = ({ popupType, onClose, onSave, initialValues }: PopupProps) => {
+const Popup = ({ popupType, onClose, onSave, initialValues, images, onImageSelect }: PopupProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [hoveredBox, setHoveredBox] = React.useState<'export' | 'import' | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -34,6 +36,7 @@ const Popup = ({ popupType, onClose, onSave, initialValues }: PopupProps) => {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [recentImages, setRecentImages] = useState<string[]>([]);
+  const imageIdMapRef = useRef<Record<string, number>>({});
 
   const handleDivClick = () => {
     fileInputRef.current?.click();
@@ -104,6 +107,17 @@ const Popup = ({ popupType, onClose, onSave, initialValues }: PopupProps) => {
   };
 
   const handleRecentImageSelect = (src: string) => {
+    const mappedId = imageIdMapRef.current[src];
+    if (mappedId !== undefined && typeof onImageSelect === "function") {
+      try {
+        onImageSelect(mappedId);
+      } catch (err) {
+        console.error("onImageSelect threw:", err);
+      }
+      onClose?.();
+      return;
+    }
+
     setPreviewImage(src);
     setSelectedFile(null);
   };
@@ -172,7 +186,7 @@ const Popup = ({ popupType, onClose, onSave, initialValues }: PopupProps) => {
           setTimeout(() => {
             onClose?.();
             // Reload the page to reflect imported data
-            window.location.reload();
+            globalThis.location.reload();
           }, 2000);
         } else if (result.canceled) {
           setExportImportMessage('Import geannuleerd');
@@ -196,22 +210,45 @@ const Popup = ({ popupType, onClose, onSave, initialValues }: PopupProps) => {
 
     (async () => {
       try {
+        const idMap: Record<string, number> = {};
+
+        // Prefer parent-supplied images when provided
+        if (Array.isArray(images) && images.length > 0) {
+          const sorted = images.slice().sort((a, b) => b.imageId - a.imageId).slice(0, 3);
+          const paths = sorted.map((i) => {
+            const p = i.path?.startsWith('/') ? i.path : '/' + i.path;
+            idMap[p] = i.imageId;
+            return p;
+          });
+          setRecentImages(paths);
+          imageIdMapRef.current = idMap;
+          return;
+        }
+
+        // Fallback: fetch recent images from electron API
         if (typeof globalThis !== 'undefined' && (globalThis as any).electronAPI?.getImages) {
           const imgs = await (globalThis as any).electronAPI.getImages();
           if (Array.isArray(imgs) && imgs.length > 0) {
             const sorted = imgs.slice().sort((a: any, b: any) => b.imageId - a.imageId).slice(0, 3);
-            const paths = sorted.map((i: any) => (i.path?.startsWith('/') ? i.path : '/' + i.path));
+            const paths = sorted.map((i: any) => {
+              const p = i.path?.startsWith('/') ? i.path : '/' + i.path;
+              idMap[p] = i.imageId;
+              return p;
+            });
             setRecentImages(paths);
+            imageIdMapRef.current = idMap;
           } else {
             setRecentImages([]);
+            imageIdMapRef.current = {};
           }
         }
       } catch (err) {
         console.error('Failed to load recent images', err);
         setRecentImages([]);
+        imageIdMapRef.current = {};
       }
     })();
-  }, [popupType]);
+  }, [popupType, images]);
 
   const [amount, setAmount] = useState("");
   const [shape, setShape] = useState<"circle" | "rectangle">("circle");
@@ -279,17 +316,19 @@ const Popup = ({ popupType, onClose, onSave, initialValues }: PopupProps) => {
               <p className="my-6 text-2xl text-[var(--dark-text)] text-center">Of kies uit eerdere foto's</p>
               <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mb-6">
                 {recentImages.map((src, idx) => (
-                  <div
+                  <button
                     key={`${src}-${idx}`}
+                    type="button"
                     onClick={() => handleRecentImageSelect(src)}
-                    className="cursor-pointer rounded-2xl overflow-hidden shadow hover:shadow-lg transition-shadow h-[9vw] w-[9vw] mb-6 mx-3"
+                    className="rounded-2xl overflow-hidden shadow hover:shadow-lg transition-shadow h-[9vw] w-[9vw] mb-6 mx-3 p-0"
+                    aria-label={`Kies foto ${idx + 1}`}
                   >
                     <img
                       src={src}
                       alt={`Recent ${idx + 1}`}
                       className="w-full h-full object-contain object-center"
                     />
-                  </div>
+                  </button>
                 ))}
               </div>
             </>
@@ -328,7 +367,14 @@ const Popup = ({ popupType, onClose, onSave, initialValues }: PopupProps) => {
                   <p className="text-sm font-bold text-[var(--color-primary)]">Voorbeeld:</p>
                 </div>
                 <div className="w-full h-65 border border-gray-300 rounded-lg bg-white flex items-center justify-center">
-                  <GridPreset shape={shape} size={size} scale={0.3} total={Number.parseInt(amount || '0', 10)} />
+                  <GridPreset 
+                    shape={shape} 
+                    size={size} 
+                    scale={0.3} 
+                    total={Number.parseInt(amount || '0', 10)} 
+                    rowGapRem={0.5}
+                    colGapRem={0.25}
+                  />
                 </div>
               </div>
             </div>

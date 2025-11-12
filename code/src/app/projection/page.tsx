@@ -21,6 +21,9 @@ interface Circle {
   x: number;
   y: number;
   radius: number;
+  width?: number;  // For rectangular shapes
+  height?: number; // For rectangular shapes
+  shape?: "circle" | "rectangle"; // To know which detection method to use
 }
 
 interface GridLayout {
@@ -44,6 +47,19 @@ interface Step {
   presetId: number;
 }
 
+// Configuration for max circles per page based on shape and size
+const GRID_CONFIG = {
+  "rectangle-small": { rows: 3, cols: 5, maxPerPage: 15 },
+  "rectangle-medium": { rows: 2, cols: 4, maxPerPage: 8 },
+  "rectangle-large": { rows: 2, cols: 3, maxPerPage: 6 },
+  "circle-small": { rows: 3, cols: 5, maxPerPage: 15 },
+  "circle-medium": { rows: 2, cols: 4, maxPerPage: 8 },
+  "circle-large": { rows: 1, cols: 4, maxPerPage: 4 },
+  "square-small": { rows: 3, cols: 5, maxPerPage: 15 },
+  "square-medium": { rows: 2, cols: 4, maxPerPage: 8 },
+  "square-large": { rows: 2, cols: 3, maxPerPage: 6 },
+} as const;
+
 // --- Component --------------------------------------------------------------
 export default function ProjectionPage() {
   const router = useRouter();
@@ -51,6 +67,7 @@ export default function ProjectionPage() {
   // Refs for camera & processing
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const pageAdvanceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Calibration / webcam states
   const [calibrationData, setCalibrationData] = useState<CalibrationData | null>(null);
@@ -59,7 +76,36 @@ export default function ProjectionPage() {
   // Grid / detection state
   const [circles, setCircles] = useState<Circle[]>([]);
   const [circleStates, setCircleStates] = useState<boolean[]>([]);
+  // Tracks circles that have been permanently completed (page cleared) and
+  // should be excluded from further detection and counted as finished.
+  const [permanentCompleted, setPermanentCompleted] = useState<boolean[]>([]);
+  // Refs that mirror the above arrays so detection can read the latest values
+  // synchronously and avoid races with state updates.
+  const circleStatesRef = useRef<boolean[]>([]);
+  const permanentCompletedRef = useRef<boolean[]>([]);
+
+  const updateCircleStates = (newStates: boolean[]) => {
+    circleStatesRef.current = newStates;
+    setCircleStates(newStates);
+  };
+
+  const updatePermanentCompleted = (newStates: boolean[]) => {
+    permanentCompletedRef.current = newStates;
+    setPermanentCompleted(newStates);
+  };
   const [gridLayout, setGridLayout] = useState<GridLayout | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [isAutoAdvancing, setIsAutoAdvancing] = useState(false);
+  // Ref to track the last programmatic advance target and timestamp so we can
+  // ignore child page-change callbacks that try to revert shortly afterwards.
+  const programmaticTargetRef = useRef<number | null>(null);
+  const programmaticTimeRef = useRef<number | null>(null);
+  const currentPageRef = useRef(currentPage);
+
+  useEffect(() => {
+    currentPageRef.current = currentPage;
+  }, [currentPage]);
 
   // Image state
   const [currentImage, setCurrentImage] = useState<ImageData | null>(null);
@@ -70,6 +116,7 @@ export default function ProjectionPage() {
   const [isCountingDown, setIsCountingDown] = useState(false);
   const [isDone, setIsDone] = useState(false);
   const [isAllStepsComplete, setIsAllStepsComplete] = useState(false);
+  const [waitingForClear, setWaitingForClear] = useState(false);
 
   // --- Load steps and determine if grid or image ---
   useEffect(() => {
@@ -109,7 +156,8 @@ export default function ProjectionPage() {
         localStorage.setItem("currentStepIndex", stepIndex.toString());
 
         // Check if this is an image step or grid step
-        if (currentStep.imageId) {
+        // Use explicit null/undefined checks so falsy numeric ids (0) are handled correctly
+        if (currentStep.imageId !== null && currentStep.imageId !== undefined) {
           // IMAGE STEP
           setIsImageStep(true);
           
@@ -130,7 +178,7 @@ export default function ProjectionPage() {
             advanceToNextStep();
           }, 5000);
 
-        } else if (currentStep.gridLayoutId) {
+        } else if (currentStep.gridLayoutId !== null && currentStep.gridLayoutId !== undefined) {
           // GRID STEP
           setIsImageStep(false);
           localStorage.setItem("currentGridLayoutId", currentStep.gridLayoutId.toString());
@@ -161,9 +209,28 @@ export default function ProjectionPage() {
 
           setGridLayout(parsedLayout);
 
-          const generatedCircles = generateCirclesFromLayout(parsedLayout);
+          // Calculate total pages needed for this grid layout
+          const key = `${parsedLayout.shape}-${parsedLayout.size}` as keyof typeof GRID_CONFIG;
+          const config = GRID_CONFIG[key];
+          const maxPerPage = config.maxPerPage;
+          const calculatedTotalPages = Math.ceil(parsedLayout.amount / maxPerPage);
+          setTotalPages(calculatedTotalPages);
+
+          // Generate ALL circles for the entire grid layout
+          const generatedCircles = generateCirclesFromLayout(parsedLayout, maxPerPage);
           setCircles(generatedCircles);
-          setCircleStates(new Array(generatedCircles.length).fill(false));
+          updateCircleStates(new Array(parsedLayout.amount).fill(false));
+          updatePermanentCompleted(new Array(parsedLayout.amount).fill(false));
+          setCurrentPage(0); // Reset to first page for new step
+          setIsAutoAdvancing(false);
+          
+          // Clear any existing page advance timeout
+          if (pageAdvanceTimeoutRef.current) {
+            clearTimeout(pageAdvanceTimeoutRef.current);
+            pageAdvanceTimeoutRef.current = null;
+          }
+
+          console.log(`📊 Loaded grid: ${parsedLayout.amount} circles, ${calculatedTotalPages} pages, ${maxPerPage} per page`);
         } else {
           alert("Step has no grid layout or image");
           router.push("/");
@@ -189,7 +256,7 @@ export default function ProjectionPage() {
       const steps = await api.getStepsByPreset(Number(presetId));
 
       if (stepIndex >= steps.length) {
-        console.log("🎉 All steps completed! Showing completion message...");
+        console.log("🎉 All steps completed! Restarting preset from step 1...");
 
         // Stop webcam if active
         if (videoRef.current?.srcObject) {
@@ -198,15 +265,14 @@ export default function ProjectionPage() {
           videoRef.current.srcObject = null;
         }
 
-        setIsAllStepsComplete(true);
+        // Reset the step index to 0 so the preset will replay from the first step
+        localStorage.setItem("currentStepIndex", "0");
+        // Clear any cached grid layout marker so the reload starts clean
+        localStorage.removeItem("currentGridLayoutId");
 
-        setTimeout(() => {
-          console.log("⏰ 5 seconds elapsed, returning to homepage...");
-          localStorage.removeItem("currentPresetId");
-          localStorage.removeItem("currentStepIndex");
-          localStorage.removeItem("currentGridLayoutId");
-          router.push("/");
-        }, 5000);
+        // Reload the page to re-initiate the preset loop
+        globalThis.location.reload();
+        return;
       } else {
         console.log(`⏭️ Loading step ${stepIndex + 1}...`);
         localStorage.setItem("currentStepIndex", stepIndex.toString());
@@ -219,48 +285,15 @@ export default function ProjectionPage() {
   };
 
   // --- Generate circles based on grid layout ---
-  const generateCirclesFromLayout = (layout: GridLayout): Circle[] => {
-    const { amount, shape, size } = layout;
+  const generateCirclesFromLayout = (layout: GridLayout, maxPerPage: number): Circle[] => {
+    const { amount } = layout;
     const circles: Circle[] = [];
 
     const canvasWidth = 1280;
     const canvasHeight = 720;
 
-    let radius = 80;
-    if (size === "small") radius = 60;
-    else if (size === "medium") radius = 100;
-    else if (size === "large") radius = 140;
-
-    let cols = 0;
-    let rows = 0;
-
-    if (shape === "square") {
-      cols = Math.ceil(Math.sqrt(amount));
-      rows = Math.ceil(amount / cols);
-    } else if (shape === "rectangle") {
-      cols = Math.ceil(Math.sqrt(amount * 1.5));
-      rows = Math.ceil(amount / cols);
-    } else {
-      cols = Math.min(4, amount);
-      rows = Math.ceil(amount / cols);
-    }
-
-    const horizontalSpacing = canvasWidth / (cols + 1);
-    const verticalSpacing = canvasHeight / (rows + 1);
-
-    let id = 0;
-    for (let row = 0; row < rows && id < amount; row++) {
-      for (let col = 0; col < cols && id < amount; col++) {
-        circles.push({
-          id,
-          x: horizontalSpacing * (col + 1),
-          y: verticalSpacing * (row + 1),
-          radius,
-        });
-        id++;
-      }
-    }
-
+    // This generates circles for ONE page at a time
+    // The GridPreset component will handle showing the correct subset
     return circles;
   };
 
@@ -365,40 +398,214 @@ export default function ProjectionPage() {
   // --- Detection function ---
   const detectObjectsInCircles = useCallback(
     (imageData: Uint8ClampedArray, width: number, height: number) => {
-      if (circles.length === 0) return;
+      if (!gridLayout) return;
 
-      const newCircleStates = circles.map((circle) => {
-        let totalPixels = 0;
-        let darkPixels = 0;
-        const step = 5;
+      // Get current page configuration
+      const key = `${gridLayout.shape}-${gridLayout.size}` as keyof typeof GRID_CONFIG;
+      const config = GRID_CONFIG[key];
+      const maxPerPage = config.maxPerPage;
+      
+      const startIndex = currentPage * maxPerPage;
+      const endIndex = Math.min(startIndex + maxPerPage, gridLayout.amount);
+      const currentPageCount = endIndex - startIndex;
 
-        for (let y = Math.max(0, Math.floor(circle.y - circle.radius)); y <= Math.min(height - 1, Math.floor(circle.y + circle.radius)); y += step) {
-          for (let x = Math.max(0, Math.floor(circle.x - circle.radius)); x <= Math.min(width - 1, Math.floor(circle.x + circle.radius)); x += step) {
-            const dx = x - circle.x;
-            const dy = y - circle.y;
-            if (dx * dx + dy * dy <= circle.radius * circle.radius) {
+      // Generate circles for current page only
+      const pageCircles = generateCirclesForPage(gridLayout, currentPageCount, maxPerPage);
+
+  const newCircleStates = [...circleStatesRef.current];
+  let hasChanges = false;
+  // Debug: log page info occasionally
+  // console.log(`detect: page=${currentPage+1} start=${startIndex} end=${endIndex} count=${pageCircles.length}`);
+      pageCircles.forEach((circle, localIndex) => {
+        const globalIndex = startIndex + localIndex;
+
+  // Skip detection for permanently completed circles
+  if (permanentCompletedRef.current[globalIndex]) return;
+
+        // ONLY detect changes for circles on the CURRENT page
+        // Don't touch circles from other pages at all
+
+  let totalPixels = 0;
+  let darkPixels = 0;
+  // sampling step - smaller value = more samples, more CPU but better
+  // sensitivity on subsequent pages
+  const step = 3;
+
+        // Use different detection logic based on shape
+        if (circle.shape === "rectangle" && circle.width && circle.height) {
+          // Rectangle detection: check pixels within the rectangular bounds
+          const halfWidth = circle.width / 2;
+          const halfHeight = circle.height / 2;
+          
+          // Debug: log rectangle bounds for first rectangle
+          if (globalIndex === startIndex) {
+            console.log(`🔍 Rectangle ${globalIndex} detection area:`);
+            console.log(`   Center: (${circle.x.toFixed(1)}, ${circle.y.toFixed(1)})`);
+            console.log(`   Size: ${circle.width.toFixed(1)}×${circle.height.toFixed(1)}px`);
+            console.log(`   Bounds: X[${(circle.x - halfWidth).toFixed(1)} to ${(circle.x + halfWidth).toFixed(1)}]`);
+            console.log(`   Bounds: Y[${(circle.y - halfHeight).toFixed(1)} to ${(circle.y + halfHeight).toFixed(1)}]`);
+          }
+          
+          for (let y = Math.max(0, Math.floor(circle.y - halfHeight)); y <= Math.min(height - 1, Math.floor(circle.y + halfHeight)); y += step) {
+            for (let x = Math.max(0, Math.floor(circle.x - halfWidth)); x <= Math.min(width - 1, Math.floor(circle.x + halfWidth)); x += step) {
               totalPixels++;
               const idx = (y * width + x) * 4;
               const r = imageData[idx];
               const g = imageData[idx + 1];
               const b = imageData[idx + 2];
               const brightness = (r + g + b) / 3;
-              if (brightness < 200) darkPixels++;
+              if (brightness < 180) darkPixels++;
+            }
+          }
+        } else {
+          // Circle detection: check pixels within the circular bounds
+          for (let y = Math.max(0, Math.floor(circle.y - circle.radius)); y <= Math.min(height - 1, Math.floor(circle.y + circle.radius)); y += step) {
+            for (let x = Math.max(0, Math.floor(circle.x - circle.radius)); x <= Math.min(width - 1, Math.floor(circle.x + circle.radius)); x += step) {
+              const dx = x - circle.x;
+              const dy = y - circle.y;
+              if (dx * dx + dy * dy <= circle.radius * circle.radius) {
+                totalPixels++;
+                const idx = (y * width + x) * 4;
+                const r = imageData[idx];
+                const g = imageData[idx + 1];
+                const b = imageData[idx + 2];
+                const brightness = (r + g + b) / 3;
+                // slightly lower threshold to be more sensitive to darker items
+                if (brightness < 180) darkPixels++;
+              }
             }
           }
         }
 
-        return totalPixels > 0 && darkPixels / totalPixels > 0.3;
+        const isDetected = totalPixels > 0 && darkPixels / totalPixels > 0.3;
+        if (isDetected) {
+          console.log(`🔍 detect: page ${currentPage + 1} circle ${globalIndex} samples=${totalPixels} dark=${darkPixels} ratio=${(darkPixels/totalPixels).toFixed(2)}`);
+        }
+        if (newCircleStates[globalIndex] !== isDetected) {
+          newCircleStates[globalIndex] = isDetected;
+          hasChanges = true;
+          console.log(`🔴 Circle ${globalIndex} (page ${currentPage + 1}) changed to ${isDetected}`);
+        }
       });
 
-      setCircleStates(newCircleStates);
+      if (hasChanges) {
+        updateCircleStates(newCircleStates);
+      }
     },
-    [circles]
+    [gridLayout, currentPage]
   );
+
+  // Helper function to generate circles for a specific page
+  // Replace the generateCirclesForPage function with this corrected version:
+
+// Replace the generateCirclesForPage function with this corrected version:
+
+const generateCirclesForPage = (layout: GridLayout, count: number, maxPerPage: number): Circle[] => {
+  const circles: Circle[] = [];
+  const { shape, size } = layout;
+
+  const canvasWidth = 1280;
+  const canvasHeight = 720;
+
+  // Get the grid configuration to match the actual layout
+  const key = `${shape}-${size}` as keyof typeof GRID_CONFIG;
+  const config = GRID_CONFIG[key];
+  const cols = config.cols;
+  const rows = config.rows;
+
+  // Convert vw units to pixels for detection
+  // At 1280px canvas width, 1vw = 12.8px
+  const vwToPx = canvasWidth / 100;
+  
+  // Match the Shape component's size calculations
+  let widthVw = 10;
+  let heightVw = 10;
+  
+  if (shape === "circle" || shape === "square") {
+    if (size === "small") { widthVw = 10; heightVw = 10; }
+    else if (size === "medium") { widthVw = 15; heightVw = 15; }
+    else if (size === "large") { widthVw = 20; heightVw = 20; }
+  } else if (shape === "rectangle") {
+    if (size === "small") { widthVw = 12; heightVw = 6; }
+    else if (size === "medium") { widthVw = 18; heightVw = 9; }
+    else if (size === "large") { widthVw = 24; heightVw = 12; }
+  }
+  
+  const width = widthVw * vwToPx;
+  const height = heightVw * vwToPx;
+  const radius = Math.min(width, height) / 2;
+
+  // The CSS Grid uses gaps which affect visual positioning
+  // For rectangles: 3rem (48px) row gap, 1rem (16px) col gap
+  // For circles: 1rem (16px) for both
+  const remToPx = 16;
+  const rowGapPx = shape === "rectangle" ? 6 * remToPx : 2 * remToPx; // Increased vertical spacing
+  const colGapPx = 1 * remToPx;
+  
+  // Calculate total space taken by gaps
+  const totalRowGaps = (rows - 1) * rowGapPx;
+  const totalColGaps = (cols - 1) * colGapPx;
+  
+  // For rectangles, the visual layout uses justify-content and align-content center
+  // which centers the entire grid within the canvas
+  // Space available for cells after subtracting gaps
+  const availableWidth = canvasWidth - totalColGaps;
+  const availableHeight = canvasHeight - totalRowGaps;
+  
+  // Each cell's size in the available space
+  const cellWidth = availableWidth / cols;
+  const cellHeight = availableHeight / rows;
+  
+  // Calculate the total grid size including gaps
+  const totalGridWidth = (cellWidth * cols) + totalColGaps;
+  const totalGridHeight = (cellHeight * rows) + totalRowGaps;
+  
+  // Calculate offset to center the grid (matching CSS justify-content/align-content: center)
+  const gridOffsetX = (canvasWidth - totalGridWidth) / 2;
+  const gridOffsetY = (canvasHeight - totalGridHeight) / 2;
+
+  let id = 0;
+  for (let row = 0; row < rows && id < count; row++) {
+    for (let col = 0; col < cols && id < count; col++) {
+      // Position calculation:
+      // Start with grid offset, then add cell position and gaps
+      const cellStartX = gridOffsetX + (col * cellWidth) + (col * colGapPx);
+      const cellStartY = gridOffsetY + (row * cellHeight) + (row * rowGapPx);
+      const x = cellStartX + cellWidth / 2;
+      const y = cellStartY + cellHeight / 2;
+      
+      circles.push({
+        id,
+        x,
+        y,
+        radius,
+        width,
+        height,
+        shape: shape === "square" ? "circle" : shape,
+      });
+      id++;
+      
+      // Debug log for first shape to verify calculations
+      if (id === 1) {
+        console.log(`📐 Grid config: ${shape}-${size}`);
+        console.log(`   Canvas: ${canvasWidth}×${canvasHeight}px, Grid: ${rows}r×${cols}c`);
+        console.log(`   Row gap: ${rowGapPx}px, Col gap: ${colGapPx}px`);
+        console.log(`   Total gaps: rows=${totalRowGaps}px, cols=${totalColGaps}px`);
+        console.log(`   Grid size: ${totalGridWidth.toFixed(1)}×${totalGridHeight.toFixed(1)}px`);
+        console.log(`   Grid offset: (${gridOffsetX.toFixed(1)}, ${gridOffsetY.toFixed(1)})`);
+        console.log(`   Cell: ${cellWidth.toFixed(1)}×${cellHeight.toFixed(1)}px`);
+        console.log(`   Shape size: ${width.toFixed(1)}×${height.toFixed(1)}px`);
+        console.log(`   First shape center: (${x.toFixed(1)}, ${y.toFixed(1)})`);
+      }
+    }
+  }
+
+  return circles;
+};
 
   // --- Frame processing ---
   const processFrame = useCallback(() => {
-    if (!calibrationData || !canvasRef.current || !videoRef.current) return;
+    if (!calibrationData || !canvasRef.current || !videoRef.current || !gridLayout) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -457,8 +664,37 @@ export default function ProjectionPage() {
     }
 
     ctx.putImageData(dstImage, 0, 0);
+    
+    // DEBUG: Draw detection areas on canvas to visualize where we're checking
+    if (gridLayout) {
+      const key = `${gridLayout.shape}-${gridLayout.size}` as keyof typeof GRID_CONFIG;
+      const config = GRID_CONFIG[key];
+      const maxPerPage = config.maxPerPage;
+      const startIndex = currentPage * maxPerPage;
+      const endIndex = Math.min(startIndex + maxPerPage, gridLayout.amount);
+      const currentPageCount = endIndex - startIndex;
+      const pageCircles = generateCirclesForPage(gridLayout, currentPageCount, maxPerPage);
+      
+      ctx.strokeStyle = 'red';
+      ctx.lineWidth = 2;
+      pageCircles.forEach(circle => {
+        if (circle.shape === "rectangle" && circle.width && circle.height) {
+          ctx.strokeRect(
+            circle.x - circle.width / 2,
+            circle.y - circle.height / 2,
+            circle.width,
+            circle.height
+          );
+        } else {
+          ctx.beginPath();
+          ctx.arc(circle.x, circle.y, circle.radius, 0, 2 * Math.PI);
+          ctx.stroke();
+        }
+      });
+    }
+    
     detectObjectsInCircles(dstData, targetWidth, targetHeight);
-  }, [calibrationData, detectObjectsInCircles]);
+  }, [calibrationData, detectObjectsInCircles, gridLayout, currentPage]);
 
   // --- Animation loop ---
   useEffect(() => {
@@ -469,18 +705,18 @@ export default function ProjectionPage() {
       animationFrameId = requestAnimationFrame(animate);
     };
 
-    if (isWebcamActive && calibrationData && circles.length > 0 && !isImageStep) {
+    if (isWebcamActive && calibrationData && gridLayout && !isImageStep) {
       animate();
     }
 
     return () => {
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
     };
-  }, [isWebcamActive, calibrationData, circles, processFrame, isImageStep]);
+  }, [isWebcamActive, calibrationData, gridLayout, processFrame, isImageStep]);
 
-  // --- Auto-start webcam when calibration & circles loaded (only for grid steps) ---
+  // --- Auto-start webcam when calibration loaded (only for grid steps) ---
   useEffect(() => {
-    if (calibrationData && circles.length > 0 && !isImageStep) {
+    if (calibrationData && gridLayout && !isImageStep) {
       startWebcam();
     }
 
@@ -492,45 +728,150 @@ export default function ProjectionPage() {
       }
       setIsWebcamActive(false);
     };
-  }, [calibrationData, circles, startWebcam, isImageStep]);
+  }, [calibrationData, gridLayout, startWebcam, isImageStep]);
 
-  // --- Countdown & step advancement for GRID steps ---
+  // --- Auto page advancement and step logic ---
   useEffect(() => {
     // Skip this logic for image steps
-    if (isImageStep) return;
+    if (isImageStep || !gridLayout) return;
 
-    const allGreen = circleStates.length > 0 && circleStates.every((s) => s === true);
-    const allRed = circleStates.length > 0 && circleStates.every((s) => s === false);
+    const key = `${gridLayout.shape}-${gridLayout.size}` as keyof typeof GRID_CONFIG;
+    const config = GRID_CONFIG[key];
+    const maxPerPage = config.maxPerPage;
+    
+    const startIndex = currentPage * maxPerPage;
+    const endIndex = Math.min(startIndex + maxPerPage, gridLayout.amount);
 
-    if (isDone && allRed) {
-      setIsDone(false);
-      advanceToNextStep();
+    // Use ref-backed arrays to avoid races between detection (which writes refs)
+    // and React state updates. Compute current page / global completion from
+    // the latest ref values.
+    const refStates = circleStatesRef.current;
+    const refPermanent = permanentCompletedRef.current;
+
+    const currentPageStates = refStates.slice(startIndex, endIndex);
+    const currentPagePermanent = refPermanent.slice(startIndex, endIndex);
+    const currentPageCompleted =
+      currentPageStates.length > 0 && currentPageStates.every((s, i) => s === true || currentPagePermanent[i] === true);
+    const currentPageEmpty = currentPageStates.length > 0 && currentPageStates.every((s) => s === false);
+
+    // Check if ALL circles (across all pages) are completed either by detection or permanently
+    const allCirclesCompleted = refStates.length > 0 && refStates.every((s, i) => s === true || refPermanent[i] === true);
+    const allCirclesEmpty = refStates.length > 0 && refStates.every((s) => s === false);
+
+    const completedCount = refStates.filter(Boolean).length + refPermanent.filter(Boolean).length;
+    console.log(`🔍 DEBUG: Page ${currentPage + 1}/${totalPages}, Completed:${completedCount}/${gridLayout.amount}, PageComplete:${currentPageCompleted}, AllComplete:${allCirclesCompleted}, Counting:${isCountingDown}, Waiting:${waitingForClear}, Done:${isDone}`);
+
+    // FINAL STEP: If all circles completed and we're done, wait for all to be cleared
+    if (isDone && !isAllStepsComplete) {
+      if (allCirclesEmpty) {
+        console.log("✅ All circles cleared after completion! Moving to next step...");
+        setIsDone(false);
+        advanceToNextStep();
+      }
       return;
     }
 
-    if (allGreen && !isCountingDown && !isDone) {
+    // If waiting for clear and page is cleared, advance to next page
+    if (waitingForClear && currentPageEmpty && currentPage < totalPages - 1) {
+      console.log(`➡️ Page cleared! Advancing from page ${currentPage + 1} to page ${currentPage + 2}`);
+      
+      // Mark the cleared circles as permanently completed and clear live detections
+      {
+        const permCopy = [...permanentCompletedRef.current];
+        for (let i = startIndex; i < endIndex; i++) permCopy[i] = true;
+        updatePermanentCompleted(permCopy);
+      }
+      {
+        const liveCopy = [...circleStatesRef.current];
+        for (let i = startIndex; i < endIndex; i++) liveCopy[i] = false;
+        updateCircleStates(liveCopy);
+      }
+      
+      // Mark this as a programmatic advance so child pagination doesn't immediately
+      // overwrite it (GridPreset is uncontrolled and may emit its own page 0 on mount).
+      const target = currentPage + 1;
+      programmaticTargetRef.current = target;
+      programmaticTimeRef.current = Date.now();
+      setCurrentPage(target);
+      // Clear the programmatic marker after a longer window to avoid late reverts
+      setTimeout(() => {
+        if (programmaticTargetRef.current === target) {
+          programmaticTargetRef.current = null;
+          programmaticTimeRef.current = null;
+        }
+      }, 5000);
+      setWaitingForClear(false);
+      return;
+    }
+
+    // PAGE FLOW: Current page completed (but not all circles)
+    if (currentPageCompleted && !allCirclesCompleted && currentPage < totalPages - 1 && !isCountingDown && !waitingForClear) {
+      console.log(`🔄 Page ${currentPage + 1}/${totalPages} completed. Starting 5-second countdown...`);
+      console.log(`📊 Progress: ${completedCount}/${gridLayout.amount} circles completed`);
       setIsCountingDown(true);
       setCountdown(5);
-    } else if (!allGreen && isCountingDown && !isDone) {
+    }
+    // Cancel countdown if page is no longer completed
+    else if (isCountingDown && !currentPageCompleted && !allCirclesCompleted && !waitingForClear) {
+      console.log(`⏸️ Page no longer completed. Stopping countdown.`);
       setIsCountingDown(false);
       setCountdown(null);
     }
-  }, [circleStates, isCountingDown, isDone, isImageStep]);
+
+    // FINAL COMPLETION: All circles are completed
+    if (allCirclesCompleted && !isCountingDown && !isDone && !waitingForClear) {
+      console.log(`🎉 ALL ${gridLayout.amount} circles completed! Starting 5-second countdown...`);
+      setIsCountingDown(true);
+      setCountdown(5);
+    } 
+    // Cancel final countdown if not all circles completed anymore
+    else if (isCountingDown && !allCirclesCompleted && !currentPageCompleted && !waitingForClear) {
+      console.log(`⏸️ Not all circles completed anymore. Stopping countdown.`);
+      setIsCountingDown(false);
+      setCountdown(null);
+    }
+  }, [circleStates, isCountingDown, isDone, isImageStep, gridLayout, currentPage, totalPages, waitingForClear, isAllStepsComplete]);
 
   // --- Countdown timer effect ---
   useEffect(() => {
+    console.log(`⏱️ Countdown effect: isCountingDown=${isCountingDown}, countdown=${countdown}`);
+    
     if (isCountingDown && countdown !== null && countdown > 0) {
+      console.log(`⏱️ Setting timer for countdown ${countdown}`);
       const timer = setTimeout(() => {
-        setCountdown((c) => (c !== null ? c - 1 : c));
+        console.log(`⏱️ Timer fired, decrementing from ${countdown}`);
+        setCountdown((c) => {
+          const newVal = c !== null ? c - 1 : c;
+          console.log(`⏱️ Countdown updated: ${c} -> ${newVal}`);
+          return newVal;
+        });
       }, 1000);
-      return () => clearTimeout(timer);
-    } else if (countdown === 0) {
-      console.log("Countdown complete!");
+      return () => {
+        console.log(`⏱️ Cleaning up timer`);
+        clearTimeout(timer);
+      };
+    } else if (countdown === 0 && isCountingDown) {
+      console.log("⏱️ Countdown reached 0!");
       setIsCountingDown(false);
       setCountdown(null);
-      setIsDone(true);
+      
+      // Check if this was the final completion or just a page. Consider both
+      // live detections and permanently completed markers.
+      const allCirclesCompleted =
+        circleStates.length > 0 && circleStates.every((s, i) => s === true || permanentCompleted[i] === true);
+      
+      if (allCirclesCompleted) {
+        // Final completion - wait for all circles to be cleared
+        console.log("⏳ Final completion - Waiting for all circles to be cleared...");
+        setIsDone(true);
+      } else {
+        // Page completion - wait for current page to be cleared
+        console.log("⏳ Page completion - Waiting for current page to be cleared...");
+        setWaitingForClear(true);
+      }
     }
-  }, [countdown, isCountingDown]);
+  }, [countdown, isCountingDown, circleStates, permanentCompleted]);
+
 
   // --- ESC handler to exit ---
   useEffect(() => {
@@ -550,12 +891,32 @@ export default function ProjectionPage() {
   }, [router]);
 
   // --- Handler for manual clicks from GridPreset ---
-  const handleShapeClick = (index: number) => {
-    setCircleStates((prev) => {
-      const copy = [...prev];
-      copy[index] = !copy[index];
-      return copy;
-    });
+  const handleShapeClick = (globalIndex: number) => {
+    const copy = [...circleStatesRef.current];
+    copy[globalIndex] = !copy[globalIndex];
+    updateCircleStates(copy);
+  };
+
+  // --- Handler for page changes ---
+  const handlePageChange = (page: number) => {
+    // If a programmatic advance recently set a target, ignore child callbacks
+    // that attempt to revert back to an earlier page within a short timeframe.
+    const progTarget = programmaticTargetRef.current;
+    const progTime = programmaticTimeRef.current;
+    if (progTarget !== null && progTime !== null) {
+      const age = Date.now() - progTime;
+      if (age < 4000 && page !== progTarget) {
+        console.log(`Ignored page change callback (${page}) because programmatic advance to ${progTarget} in progress (age ${age}ms)`);
+        return;
+      }
+    }
+
+    setCurrentPage(page);
+    setIsAutoAdvancing(false);
+    if (pageAdvanceTimeoutRef.current) {
+      clearTimeout(pageAdvanceTimeoutRef.current);
+      pageAdvanceTimeoutRef.current = null;
+    }
   };
 
   // --- JSX -----------------------------------------------------------------
@@ -564,61 +925,94 @@ export default function ProjectionPage() {
       {/* Hidden video (camera source) */}
       <video ref={videoRef} autoPlay muted playsInline className="hidden" />
 
-      {/* Hidden canvas used for processing */}
-      <canvas ref={canvasRef} className="hidden" />
+      {/* Debug canvas - shows transformed video with detection areas */}
+      <canvas 
+        ref={canvasRef} 
+        className="absolute top-0 left-0 w-full h-full object-contain opacity-50 pointer-events-none" 
+        style={{ zIndex: 1000, mixBlendMode: 'multiply' }}
+      />
 
       {/* CONTENT: Image or Grid */}
       {isImageStep && currentImage ? (
-        // IMAGE STEP: Show fullscreen image
-        <div className="absolute inset-0 flex items-center justify-center bg-black">
+        // IMAGE STEP: Show fullscreen image (fit to screen, preserve aspect ratio)
+        <div className="absolute inset-0 flex items-center justify-center m-20 bg-white">
           <img
             src={`/${currentImage.path}`}
             alt={currentImage.description}
-            className="w-full h-full object-cover"
+            className="max-w-full max-h-full object-cover"
           />
         </div>
       ) : gridLayout ? (
         // GRID STEP: Show grid preset
-        <div className="w-full max-w-[1280px] max-h-[720px]">
+        <div className="w-full ">
           <GridPreset
             shape={gridLayout.shape === "square" ? "circle" : (gridLayout.shape as "circle" | "rectangle")}
             size={gridLayout.size}
             scale={1}
-            total={circles.length}
+            total={gridLayout.amount}
             pagination={true}
             completedStates={circleStates}
             onShapeClick={handleShapeClick}
+            currentPage={currentPage}
+            onPageChange={handlePageChange}
+            gap="gap-8"
           />
         </div>
       ) : (
         <div className="p-8 text-center">Laden...</div>
       )}
 
-      {/* Countdown display (only for grid steps) */}
+      {/* Page indicator */}
+      {!isImageStep && gridLayout && totalPages > 1 && (
+        <div className="absolute top-4 left-4 text-4xl font-bold text-blue-500 drop-shadow-[0_0_20px_rgba(0,100,255,0.7)]">
+          Pagina {currentPage + 1}/{totalPages}
+        </div>
+      )}
+
+      {/* Progress indicator */}
+      {!isImageStep && gridLayout && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 text-3xl font-bold text-blue-500 drop-shadow-[0_0_20px_rgba(0,100,255,0.7)]">
+          {permanentCompleted.filter(Boolean).length}/{gridLayout.amount}
+        </div>
+      )}
+
+      {/* Page advance countdown (for auto-advancing between pages) */}
+      {!isImageStep && waitingForClear && !isDone && (
+        <div className="absolute inset-0 flex flex-col items-center justify-end pointer-events-none pb-32 gap-4">
+          <div className="text-6xl font-bold text-yellow-500 drop-shadow-[0_0_20px_rgba(255,255,0,0.7)]">
+            Verwijder alle items
+          </div>
+        </div>
+      )}
+
+      {/* Countdown display (5 seconds when page/all completed) */}
       {!isImageStep && countdown !== null && countdown > 0 && (
-        <div className="absolute inset-0 flex items-end justify-center pointer-events-none">
+        <div className="absolute inset-0 flex items-end justify-center pointer-events-none pb-32">
           <div className="text-9xl font-bold text-green-500 drop-shadow-[0_0_30px_rgba(0,255,0,0.7)]">{countdown}</div>
         </div>
       )}
 
-      {/* Done display (only for grid steps) */}
+      {/* Done display - waiting for items to be removed */}
       {!isImageStep && isDone && !isAllStepsComplete && (
-        <div className="absolute inset-0 flex items-end justify-center pointer-events-none">
-          <div className="text-9xl font-bold text-blue-500 drop-shadow-[0_0_30px_rgba(0,100,255,0.7)]">done</div>
+        <div className="absolute inset-0 flex flex-col items-center justify-end pointer-events-none pb-32 gap-4">
+          <div className="text-6xl font-bold text-blue-500 drop-shadow-[0_0_20px_rgba(0,100,255,0.7)]">
+            Verwijder alle items
+          </div>
         </div>
       )}
 
       {/* All steps complete display */}
       {isAllStepsComplete && (
-        <div className="absolute inset-0 flex items-end justify-center pointer-events-none">
+        <div className="absolute inset-0 flex items-end justify-center pointer-events-none pb-32">
           <div className="text-8xl font-bold text-green-500 drop-shadow-[0_0_30px_rgba(0,255,0,0.7)]">
             alle stappen zijn klaar
           </div>
         </div>
       )}
-      {/* Step page number */}
+
+      {/* Step number */}
       <div className="absolute top-4 right-4 text-6xl font-bold text-blue-500 drop-shadow-[0_0_30px_rgba(0,100,255,0.7)]">
-        {localStorage.getItem("currentStepIndex") ? Number(localStorage.getItem("currentStepIndex")) + 1 : 1}
+        Stap {localStorage.getItem("currentStepIndex") ? Number(localStorage.getItem("currentStepIndex")) + 1 : 1}
       </div>
 
     </div>

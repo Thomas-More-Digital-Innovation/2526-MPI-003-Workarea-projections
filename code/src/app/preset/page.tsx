@@ -479,6 +479,8 @@ export default function PresetToevoegen() {
                         scale={0.05}
                         total={item.data.amount}
                         pagination={false}
+                        rowGapRem={0.5}
+                        colGapRem={0.25}
                       />
                     ) : (
                       <img
@@ -635,42 +637,15 @@ export default function PresetToevoegen() {
 
       {showPopupImage && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-          <div className="p-4 bg-[var(--color-popup)] rounded-2xl shadow relative max-w-[609px] w-[80%] md:w-[40%]">
-            <button className="absolute top-4 right-3" onClick={() => setShowPopupImage(false)}>
-              <XMarkIcon className="h-8 w-8 text-[var(--dark-text)] cursor-pointer" />
-            </button>
-            <div>
-              <h2 className="text-3xl font-bold text-center text-[var(--dark-text)] mb-4">Selecteer een foto</h2>
-              <hr className="w-full mb-4 border-1 rounded-2xl border-[#004248]/20" />
-              
-              <div className="grid gap-4 grid-cols-3 max-h-[60vh] overflow-y-auto p-2">
-                {availableImages.map((img) => (
-                  <div
-                    key={img.imageId}
-                    onClick={() => handleAddImage(img.imageId)}
-                    className="cursor-pointer rounded-2xl overflow-hidden shadow hover:shadow-lg transition-shadow aspect-square bg-white"
-                  >
-                    <img
-                      src={`/${img.path}`}
-                      alt={img.description || 'Image'}
-                      className="w-full h-full object-contain object-center"
-                    />
-                  </div>
-                ))}
-              </div>
-              
-              {availableImages.length === 0 && (
-                <div className="text-center py-8 text-gray-400">
-                  <p className="text-lg">Geen foto's beschikbaar</p>
-                  <p className="text-sm mt-2">Ga naar Foto Beheer om foto's toe te voegen</p>
-                </div>
-              )}
-              
-              <div className="w-full mt-4">
-                <Button type="secondary" text="Terug" onClick={() => setShowPopupImage(false)} />
-              </div>
-            </div>
-          </div>
+          <Popup
+            popupType="imageUpload"
+            onClose={() => setShowPopupImage(false)}
+            images={availableImages}
+            onImageSelect={(imageId: number) => {
+              handleAddImage(imageId);
+              setShowPopupImage(false);
+            }}
+          />
         </div>
       )}
 
