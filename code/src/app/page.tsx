@@ -56,6 +56,7 @@ export default function Home() {
   }
 
   async function handleStart() {
+    
     if (selectedCard === null) {
       showToast("Selecteer eerst een preset", "warning");
       return;
@@ -119,6 +120,8 @@ export default function Home() {
       showToast(`Fout bij laden preset configuratie: ${err}`, "error");
     }
   }
+}
+
 
   return (
     <div className="h-screen bg-[var(--color-secondary)]/20 flex flex-col">
