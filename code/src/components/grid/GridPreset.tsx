@@ -2,6 +2,13 @@ import React, { useState, useEffect } from "react";
 import Shape from "./Shape";
 import { ArrowLeftCircleIcon, ArrowRightCircleIcon } from "@heroicons/react/24/solid";
 
+interface ShapePosition {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 interface GridPresetProps {
   shape: "circle" | "rectangle";
   size: "small" | "medium" | "large";
@@ -12,6 +19,15 @@ interface GridPresetProps {
   completedStates?: boolean[];
   onShapeClick?: (index: number) => void; // ✅ klik op een shape
   onPageChange?: (page: number) => void;  // ✅ paginawijziging
+  // Optional controlled current page (0-based). When provided GridPreset will
+  // follow this value instead of managing its own internal page state.
+  currentPage?: number;
+  gap?: string; // Tailwind gap class (e.g., "gap-2", "gap-20")
+  // Optional positions array - if provided, use absolute positioning instead of CSS Grid
+  positions?: ShapePosition[];
+  // Custom gap values in rem units for row and column gaps
+  rowGapRem?: number;
+  colGapRem?: number;
 }
 
 const GRID_CONFIG = {
@@ -33,23 +49,41 @@ const GridPreset: React.FC<GridPresetProps> = ({
   completedStates = [],
   onShapeClick,
   onPageChange,
+  currentPage,
+  gap = "gap-2", // Default gap value
+  positions, // Optional absolute positions
+  rowGapRem, // Custom row gap in rem
+  colGapRem, // Custom column gap in rem
 }) => {
   const key = `${shape}-${size}`;
   const config = GRID_CONFIG[key as keyof typeof GRID_CONFIG];
   const effectivePerPage = Math.min(perPage, config.maxPerPage);
   const totalPages = Math.ceil(total / effectivePerPage);
 
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState<number>(currentPage ?? 0);
 
-  // Reset pagina naar 0 bij wijzigingen in vorm of totaal
+  // If parent provides a controlled currentPage prop, follow it.
   useEffect(() => {
-    setPage(0);
+    if (typeof currentPage === "number" && currentPage !== page) {
+      setPage(currentPage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage]);
+
+  // Reset pagina naar 0 bij wijzigingen in vorm of totaal, but only when
+  // uncontrolled (parent didn't provide currentPage).
+  useEffect(() => {
+    if (typeof currentPage !== "number") {
+      setPage(0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shape, size, total]);
 
-  // Meld pagina aan parent
+  // Notify parent when page changes, but only in uncontrolled mode. In
+  // controlled mode the parent already knows the page.
   useEffect(() => {
-    if (onPageChange) onPageChange(page);
-  }, [page, onPageChange]);
+    if (typeof currentPage !== "number" && onPageChange) onPageChange(page);
+  }, [page, onPageChange, currentPage]);
 
   const startIndex = page * effectivePerPage;
   const endIndex = Math.min(startIndex + effectivePerPage, total);
@@ -57,48 +91,101 @@ const GridPreset: React.FC<GridPresetProps> = ({
 
   const showArrows = pagination && totalPages > 1 && scale !== 1;
 
+  // Calculate gap based on shape - rectangles need more vertical space
+  // Use custom gaps if provided, otherwise use defaults
+  const defaultRowGap = shape === "rectangle" ? "28rem" : "18rem";
+  const rowGap = rowGapRem ? `${rowGapRem}rem` : defaultRowGap;
+  const colGap = colGapRem ? `${colGapRem}rem` : "1rem";
+
   return (
     <div className="relative w-full h-full flex flex-col items-center justify-center">
-      <div className="flex items-center w-full">
+      <div className="flex items-center w-full h-full">
         {/* Linkerpijl */}
         {showArrows ? (
           <ArrowLeftCircleIcon
             className={`w-10 h-10 text-[var(--color-primary)] cursor-pointer transition-opacity duration-200 mx-2 ${
               page === 0 ? "opacity-0 pointer-events-none" : "opacity-100"
             }`}
-            onClick={() => setPage((prev) => Math.max(prev - 1, 0))}
+            onClick={() => {
+              const next = Math.max(page - 1, 0);
+              if (typeof currentPage === "number") {
+                onPageChange?.(next);
+              } else {
+                setPage(next);
+              }
+            }}
           />
         ) : (
           <div className="w-10 h-10 mx-2" />
         )}
 
         {/* Grid */}
-        <div className="flex-1 flex items-center justify-center">
-          <div
-            className="grid gap-2 justify-center"
-            style={{
-              gridTemplateColumns: `repeat(${config.cols}, auto)`,
-              gridTemplateRows: `repeat(${config.rows}, auto)`,
-            }}
-          >
-            {shapesArray.map((_, index) => {
-              const absoluteIndex = startIndex + index;
-              const completed = completedStates
-                ? !!completedStates[absoluteIndex]
-                : false;
+        <div className="flex-1 flex items-center justify-center h-full">
+          {positions && positions.length > 0 ? (
+            // Absolute positioning mode - use provided coordinates
+            <div className="relative w-full h-full">
+              {shapesArray.map((_, index) => {
+                const absoluteIndex = startIndex + index;
+                const pos = positions[index];
+                if (!pos) return null;
+                
+                const completed = completedStates
+                  ? !!completedStates[absoluteIndex]
+                  : false;
 
-              return (
-                <Shape
-                  key={absoluteIndex}
-                  shape={shape}
-                  size={size}
-                  completed={completed}
-                  scale={scale}
-                  onClick={() => onShapeClick && onShapeClick(absoluteIndex)} // ✅ vaste naam en veilige check
-                />
-              );
-            })}
-          </div>
+                return (
+                  <div
+                    key={absoluteIndex}
+                    style={{
+                      position: 'absolute',
+                      left: `${(pos.x / 1280) * 100}%`,
+                      top: `${(pos.y / 720) * 100}%`,
+                      transform: 'translate(-50%, -50%)',
+                    }}
+                  >
+                    <Shape
+                      shape={shape}
+                      size={size}
+                      completed={completed}
+                      scale={scale}
+                      onClick={() => onShapeClick?.(absoluteIndex)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            // CSS Grid mode - original behavior
+            <div
+              className="grid w-full h-full"
+              style={{
+                gridTemplateColumns: `repeat(${config.cols}, 1fr)`,
+                gridTemplateRows: `repeat(${config.rows}, 1fr)`,
+                justifyItems: 'center',
+                alignItems: 'center',
+                rowGap: rowGap,
+                columnGap: colGap,
+              }}
+            >
+              {shapesArray.map((_, index) => {
+                const absoluteIndex = startIndex + index;
+                const completed = completedStates
+                  ? !!completedStates[absoluteIndex]
+                  : false;
+
+                return (
+                  <Shape
+                    key={absoluteIndex}
+                    shape={shape}
+                    size={size}
+                    completed={completed}
+                    scale={scale}
+                    onClick={() => onShapeClick?.(absoluteIndex)} // ✅ vaste naam en veilige check
+                  />
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Rechterpijl */}
@@ -109,7 +196,14 @@ const GridPreset: React.FC<GridPresetProps> = ({
                 ? "opacity-0 pointer-events-none"
                 : "opacity-100"
             }`}
-            onClick={() => setPage((prev) => Math.min(prev + 1, totalPages - 1))}
+            onClick={() => {
+              const next = Math.min(page + 1, totalPages - 1);
+              if (typeof currentPage === "number") {
+                onPageChange?.(next);
+              } else {
+                setPage(next);
+              }
+            }}
           />
         ) : (
           <div className="w-10 h-10 mx-2" />

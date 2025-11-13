@@ -237,6 +237,109 @@ ipcMain.handle('step:delete', (event, stepId) => {
 });
 
 //
+// 📤📥 DATA EXPORT/IMPORT
+//
+ipcMain.handle('data:export', async () => {
+  const { dialog } = await import('electron');
+  
+  try {
+    const result = await dialog.showSaveDialog({
+      title: 'Export Database',
+      defaultPath: `projection-backup-${new Date().toISOString().split('T')[0]}.json`,
+      filters: [
+        { name: 'JSON Files', extensions: ['json'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+
+    if (result.canceled) {
+      return { success: false, canceled: true };
+    }
+
+    // Export all data
+    const exportData = {
+      images: db.prepare('SELECT * FROM Image').all(),
+      gridLayouts: db.prepare('SELECT * FROM GridLayout').all(),
+      presets: db.prepare('SELECT * FROM Preset').all(),
+      steps: db.prepare('SELECT * FROM Step').all(),
+      exportDate: new Date().toISOString(),
+      version: '1.0'
+    };
+
+    await fs.promises.writeFile(result.filePath, JSON.stringify(exportData, null, 2), 'utf-8');
+    return { success: true, filePath: result.filePath };
+  } catch (error) {
+    console.error('Export error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('data:import', async () => {
+  const { dialog } = await import('electron');
+  
+  try {
+    const result = await dialog.showOpenDialog({
+      title: 'Import Database',
+      filters: [
+        { name: 'JSON Files', extensions: ['json'] },
+        { name: 'All Files', extensions: ['*'] }
+      ],
+      properties: ['openFile']
+    });
+
+    if (result.canceled || !result.filePaths.length) {
+      return { success: false, canceled: true };
+    }
+
+    const fileContent = await fs.promises.readFile(result.filePaths[0], 'utf-8');
+    const importData = JSON.parse(fileContent);
+
+    // Clear existing data
+    db.prepare('DELETE FROM Step').run();
+    db.prepare('DELETE FROM Preset').run();
+    db.prepare('DELETE FROM GridLayout').run();
+    db.prepare('DELETE FROM Image').run();
+
+    // Import images
+    const imageStmt = db.prepare('INSERT INTO Image (imageId, path, description) VALUES (?, ?, ?)');
+    for (const img of importData.images || []) {
+      imageStmt.run(img.imageId, img.path, img.description);
+    }
+
+    // Import grid layouts
+    const gridStmt = db.prepare('INSERT INTO GridLayout (gridLayoutId, shape, size, amount) VALUES (?, ?, ?, ?)');
+    for (const gl of importData.gridLayouts || []) {
+      gridStmt.run(gl.gridLayoutId, gl.shape, gl.size, gl.amount);
+    }
+
+    // Import presets
+    const presetStmt = db.prepare('INSERT INTO Preset (presetId, name, description) VALUES (?, ?, ?)');
+    for (const preset of importData.presets || []) {
+      presetStmt.run(preset.presetId, preset.name, preset.description);
+    }
+
+    // Import steps
+    const stepStmt = db.prepare('INSERT INTO Step (stepId, step, imageId, gridLayoutId, presetId) VALUES (?, ?, ?, ?, ?)');
+    for (const step of importData.steps || []) {
+      stepStmt.run(step.stepId, step.step, step.imageId, step.gridLayoutId, step.presetId);
+    }
+
+    return {
+      success: true,
+      stats: {
+        images: importData.images?.length || 0,
+        gridLayouts: importData.gridLayouts?.length || 0,
+        presets: importData.presets?.length || 0,
+        steps: importData.steps?.length || 0
+      }
+    };
+  } catch (error) {
+    console.error('Import error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+//
 // ⚙️ ELECTRON WINDOW SETUP
 //
 function createWindow() {

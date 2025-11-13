@@ -27,18 +27,34 @@ const GridCard = ({ id, title, description, preset, active = false, onSelect }: 
             {/* Image area */}
             <div className={`rounded-2xl w-full h-[50%] flex flex-col justify-center items-center p-4 bg-white`}>
                 <div className="w-full">
-                    {preset ? (
-                        // render the actual preset
+                    {(
+                      preset &&
+                      typeof preset.amount === 'number' &&
+                      preset.amount > 0 &&
+                      (preset.shape === 'circle' || preset.shape === 'rectangle' || preset.shape === 'square') &&
+                      (preset.size === 'small' || preset.size === 'medium' || preset.size === 'large')
+                    ) ? (
+                        // render the actual preset (only when the preset contains valid grid layout data)
                         <GridPreset
-                            shape={preset.shape as any}
+                            shape={preset.shape === 'square' ? 'circle' : (preset.shape as any)}
                             size={preset.size as any}
                             scale={0.1}
                             total={preset.amount}
                             pagination={false}
+                            rowGapRem={0.5}
+                            colGapRem={0.25}
                         />
                     ) : (
-                        // fallback preview
-                        <GridPreset shape="circle" size="medium" scale={0.1} total={20} pagination={false} />
+                        // fallback preview when preset does not represent a grid layout
+                        <GridPreset 
+                            shape="circle" 
+                            size="medium" 
+                            scale={0.1} 
+                            total={20} 
+                            pagination={false} 
+                            rowGapRem={0.5}
+                            colGapRem={0.25}
+                        />
                     )}
                 </div>
             </div>

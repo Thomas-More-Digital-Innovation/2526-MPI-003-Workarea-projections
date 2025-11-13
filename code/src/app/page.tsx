@@ -1,10 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Navbar, Button, Popup, GridCard, Footer, Toast } from "@/components";
-import { Link } from "lucide-react";
+import { Navbar, Button, GridCard, Footer, Toast } from "@/components";
 import { useRouter } from "next/navigation";
-import preset from "./preset/page";
 
 interface CardData {
   id: number;
@@ -13,7 +11,6 @@ interface CardData {
 }
 
 export default function Home() {
-  const [showPopup, setShowPopup] = useState(false);
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
   const [presets, setPresets] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -41,7 +38,53 @@ export default function Home() {
         const api = (globalThis as any)?.electronAPI;
         if (api?.getPresetsWithGridLayouts) {
           const result = await api.getPresetsWithGridLayouts();
-          setPresets(result || []);
+          
+          // For each preset, fetch the first step to get the correct grid layout
+          const presetsWithCorrectGrid = await Promise.all(
+            (result || []).map(async (preset) => {
+              try {
+                // Get steps for this preset
+                let steps = null;
+                if (api?.getStepsByPreset) {
+                  steps = await api.getStepsByPreset(preset.presetId);
+                } else if (api?.getStepsByPresetId) {
+                  steps = await api.getStepsByPresetId(preset.presetId);
+                }
+                
+                if (steps && steps.length > 0) {
+                  const firstStep = steps[0];
+                  // If first step has a grid layout, fetch the grid layout details
+                  if (firstStep.gridLayoutId && api?.getGridLayouts) {
+                    const gridLayouts = await api.getGridLayouts();
+                    const gridLayout = gridLayouts.find(gl => gl.gridLayoutId === firstStep.gridLayoutId);
+                    if (gridLayout) {
+                      // Return preset with correct grid layout data from first step
+                      return {
+                        ...preset,
+                        gridLayoutId: gridLayout.gridLayoutId,
+                        amount: gridLayout.amount,
+                        shape: gridLayout.shape,
+                        size: gridLayout.size,
+                      };
+                    }
+                  }
+                }
+                // No grid in first step, return preset without grid data
+                return {
+                  ...preset,
+                  gridLayoutId: null,
+                  amount: null,
+                  shape: null,
+                  size: null,
+                };
+              } catch (err) {
+                console.error(`Failed to load grid for preset ${preset.presetId}:`, err);
+                return preset;
+              }
+            })
+          );
+          
+          setPresets(presetsWithCorrectGrid);
         }
       } catch (err) {
         console.error("Failed to load presets", err);
@@ -78,7 +121,7 @@ export default function Home() {
       }
 
       // Check if we have gridLayoutId directly from the preset
-      if (selectedPreset.gridLayoutId) {
+      if (selectedPreset.gridLayoutId !== null && selectedPreset.gridLayoutId !== undefined) {
         console.log("✅ Using gridLayoutId from preset:", selectedPreset.gridLayoutId);
         localStorage.setItem('currentGridLayoutId', selectedPreset.gridLayoutId.toString());
         localStorage.setItem('currentPresetId', selectedCard.toString());
@@ -87,32 +130,41 @@ export default function Home() {
         return;
       }
 
-      // If not, try to get steps
+      // If not on the preset object, try to get steps via the Electron API.
+      let steps: any[] | null = null;
       if (api?.getStepsByPresetId) {
-        const steps = await api.getStepsByPresetId(selectedCard);
-        console.log("Steps for preset:", steps);
-
-        if (!steps || steps.length === 0) {
-          showToast("Geen stappen gevonden voor deze preset", "error");
-          return;
-        }
-
-        const firstStep = steps[0];
-        
-        if (!firstStep.gridLayoutId) {
-          showToast("Eerste stap heeft geen grid layout", "error");
-          return;
-        }
-
-        localStorage.setItem('currentGridLayoutId', firstStep.gridLayoutId.toString());
-        localStorage.setItem('currentPresetId', selectedCard.toString());
-        localStorage.setItem('currentStepIndex', '0'); // Reset step index to start from beginning
-        router.push("/projection");
+        steps = await api.getStepsByPresetId(selectedCard);
+      } else if (api?.getStepsByPreset) {
+        // Older/newer API variant used elsewhere in the codebase
+        steps = await api.getStepsByPreset(selectedCard);
       } else {
-        console.error("❌ getStepsByPresetId not found on electronAPI");
+        console.error("❌ No steps API method found on electronAPI");
         console.log("Available methods:", Object.keys(api || {}));
         showToast("Kan preset stappen niet laden - API methode niet beschikbaar", "error");
+        return;
       }
+
+      console.log("Steps for preset:", steps);
+
+      if (!steps || steps.length === 0) {
+        showToast("Geen stappen gevonden voor deze preset", "error");
+        return;
+      }
+
+      const firstStep = steps[0];
+
+      // Always set the preset and reset to step 0. If the first step has a gridLayoutId
+      // store it as well; otherwise assume it's an image step and let the projection
+      // loader fetch the step data from the API.
+      localStorage.setItem('currentPresetId', selectedCard.toString());
+      localStorage.setItem('currentStepIndex', '0'); // Reset step index to start from beginning
+      if (firstStep.gridLayoutId !== null && firstStep.gridLayoutId !== undefined) {
+        localStorage.setItem('currentGridLayoutId', firstStep.gridLayoutId.toString());
+      } else {
+        // Ensure no stale grid layout id remains
+        localStorage.removeItem('currentGridLayoutId');
+      }
+      router.push("/projection");
       
     } catch (err) {
       console.error("❌ Failed to load preset steps", err);
@@ -120,8 +172,6 @@ export default function Home() {
       showToast(`Fout bij laden preset configuratie: ${err}`, "error");
     }
   }
-}
-
 
   return (
     <div className="h-screen bg-[var(--color-secondary)]/20 flex flex-col">
@@ -134,17 +184,28 @@ export default function Home() {
         <div className="flex-1 min-h-0 overflow-y-auto p-4">
           {filteredPresets.length > 0 ? (
             <div className="flex flex-wrap gap-6">
-              {filteredPresets.map((p) => (
-                <GridCard
-                  key={p.presetId}
-                  id={p.presetId}
-                  title={p.name}
-                  description={p.description}
-                  preset={p.gridLayoutId ? p : undefined}
-                  active={selectedCard === p.presetId}
-                  onSelect={handleSelect}
-                />
-              ))}
+              {filteredPresets.map((p) => {
+                // Only pass preset prop if the preset object contains valid grid layout fields
+                const hasValidGrid = (
+                  p.gridLayoutId &&
+                  typeof p.amount === 'number' &&
+                  p.amount > 0 &&
+                  (p.shape === 'circle' || p.shape === 'rectangle' || p.shape === 'square') &&
+                  (p.size === 'small' || p.size === 'medium' || p.size === 'large')
+                );
+                
+                return (
+                  <GridCard
+                    key={p.presetId}
+                    id={p.presetId}
+                    title={p.name}
+                    description={p.description}
+                    preset={hasValidGrid ? p : undefined}
+                    active={selectedCard === p.presetId}
+                    onSelect={handleSelect}
+                  />
+                );
+              })}
             </div>
           ) : presets.length > 0 ? (
             <div className="flex flex-1 items-center justify-center h-full">
@@ -181,6 +242,13 @@ export default function Home() {
               }
               router.push(`/preset?id=${selectedCard}`);
             }}
+            fullWidth={false}
+            fixedWidth={true}
+          />
+          <Button
+            type="primary"
+            text={"calibration"}
+            onClick={handleCalibration}
             fullWidth={false}
             fixedWidth={true}
           />
