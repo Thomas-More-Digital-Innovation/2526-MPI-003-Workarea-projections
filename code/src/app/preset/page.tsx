@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import GridPreset from "@/components/grid/GridPreset";
 import { PencilIcon, TrashIcon, ArrowDownIcon, DocumentDuplicateIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import Header from "@/components/layout/Header";
 
 interface GridLayoutData {
   id: string;
@@ -419,14 +420,10 @@ export default function PresetToevoegen() {
 
   return (
     <div className="h-screen bg-[var(--color-secondary)]/20 flex flex-col">
-      <div className="p-4 pb-0 flex flex-col gap-4 w-full">
-        <div className="mx-auto max-w rounded-2xl w-full shadow-md" style={{ backgroundColor: 'var(--color-white)', padding: '0.75rem' }}>
-          <h1 className="text-center text-4xl px-6 py-3 font-semibold text-[var(--dark-text)]">
-            {editingPresetId ? "Preset Bewerken" : "Preset Toevoegen"}
-          </h1>
-        </div>
+        <Header text={editingPresetId ? "Preset Bewerken" : "Preset Toevoegen"} />
         
         {/* Preset Name and Description - Fixed at top */}
+        <div className="px-4 pt-2 pb-0 flex flex-col gap-4 w-full">
         <div className="bg-white shadow-md px-6 py-6 rounded-2xl">
           <div className="flex flex-row gap-4">
             <InputField
@@ -568,7 +565,7 @@ export default function PresetToevoegen() {
           {steps.length === 0 && (
             <div className="text-center py-8 text-gray-400">
               <p className="text-xl">Geen stappen toegevoegd</p>
-              <p className="text-md mt-2">Klik op \"Grid toevoegen\" of \"Foto toevoegen\" om te beginnen</p>
+              <p className="text-md mt-2">Klik op "Grid toevoegen" of "Foto toevoegen" om te beginnen</p>
             </div>
           )}
 
