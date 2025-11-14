@@ -351,6 +351,9 @@ function createWindow() {
     resizable: true,
     maximizable: true,
     minimizable: true,
+    icon: path.join(__dirname, '../public/MPIIcon.png'),
+    autoHideMenuBar: true,
+    frame: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

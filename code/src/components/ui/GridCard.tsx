@@ -25,7 +25,7 @@ const GridCard = ({ id, title, description, preset, active = false, onSelect }: 
     return (
         <button type="button" onClick={handleClick} className={`w-[286px] h-[340px] rounded-2xl shadow-lg p-4 flex flex-col text-left transition-colors ${active ? 'bg-[var(--color-primary)]/50 text-white' : 'bg-[var(--color-popup)] text-[var(--dark-text)]'}`}>
             {/* Image area */}
-            <div className={`rounded-2xl w-full h-[50%] flex flex-col justify-center items-center p-4 bg-white`}>
+            <div className={`rounded-2xl w-full h-[50%] flex flex-col justify-center items-center bg-white`}>
                 <div className="w-full">
                     {(
                       preset &&
@@ -38,10 +38,10 @@ const GridCard = ({ id, title, description, preset, active = false, onSelect }: 
                         <GridPreset
                             shape={preset.shape === 'square' ? 'circle' : (preset.shape as any)}
                             size={preset.size as any}
-                            scale={0.1}
+                            scale={0.128}
                             total={preset.amount}
                             pagination={false}
-                            rowGapRem={0.5}
+                            rowGapRem={1.5}
                             colGapRem={0.25}
                         />
                     ) : (
@@ -49,10 +49,10 @@ const GridCard = ({ id, title, description, preset, active = false, onSelect }: 
                         <GridPreset 
                             shape="circle" 
                             size="medium" 
-                            scale={0.1} 
+                            scale={0.128} 
                             total={20} 
                             pagination={false} 
-                            rowGapRem={0.5}
+                            rowGapRem={1.5}
                             colGapRem={0.25}
                         />
                     )}
