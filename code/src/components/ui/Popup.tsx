@@ -2,8 +2,9 @@
 
 import React, { useRef, useState } from "react";
 import Button from "./Button";
+import Toast from "./Toast";
 import { XMarkIcon } from "@heroicons/react/20/solid";
-import { CloudArrowUpIcon, ArrowUpOnSquareIcon, ArrowDownOnSquareIcon } from "@heroicons/react/24/outline";
+import { CloudArrowUpIcon, ArrowUpOnSquareIcon, ArrowDownOnSquareIcon, ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import InputField from "../forms/InputField";
 import GridPreset from "../grid/GridPreset";
 
@@ -37,6 +38,13 @@ const Popup = ({ popupType, onClose, onSave, initialValues, images, onImageSelec
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [recentImages, setRecentImages] = useState<string[]>([]);
   const imageIdMapRef = useRef<Record<string, number>>({});
+  const [currentPage, setCurrentPage] = useState(0);
+  const imagesPerPage = 3;
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" | "warning" } | null>(null);
+
+  const showToast = (message: string, type: "success" | "error" | "info" | "warning" = "info") => {
+    setToast({ message, type });
+  };
 
   const handleDivClick = () => {
     fileInputRef.current?.click();
@@ -214,7 +222,7 @@ const Popup = ({ popupType, onClose, onSave, initialValues, images, onImageSelec
 
         // Prefer parent-supplied images when provided
         if (Array.isArray(images) && images.length > 0) {
-          const sorted = images.slice().sort((a, b) => b.imageId - a.imageId).slice(0, 3);
+          const sorted = images.slice().sort((a, b) => b.imageId - a.imageId);
           const paths = sorted.map((i) => {
             const p = i.path?.startsWith('/') ? i.path : '/' + i.path;
             idMap[p] = i.imageId;
@@ -222,6 +230,7 @@ const Popup = ({ popupType, onClose, onSave, initialValues, images, onImageSelec
           });
           setRecentImages(paths);
           imageIdMapRef.current = idMap;
+          setCurrentPage(0);
           return;
         }
 
@@ -229,7 +238,7 @@ const Popup = ({ popupType, onClose, onSave, initialValues, images, onImageSelec
         if (typeof globalThis !== 'undefined' && (globalThis as any).electronAPI?.getImages) {
           const imgs = await (globalThis as any).electronAPI.getImages();
           if (Array.isArray(imgs) && imgs.length > 0) {
-            const sorted = imgs.slice().sort((a: any, b: any) => b.imageId - a.imageId).slice(0, 3);
+            const sorted = imgs.slice().sort((a: any, b: any) => b.imageId - a.imageId);
             const paths = sorted.map((i: any) => {
               const p = i.path?.startsWith('/') ? i.path : '/' + i.path;
               idMap[p] = i.imageId;
@@ -237,6 +246,7 @@ const Popup = ({ popupType, onClose, onSave, initialValues, images, onImageSelec
             });
             setRecentImages(paths);
             imageIdMapRef.current = idMap;
+            setCurrentPage(0);
           } else {
             setRecentImages([]);
             imageIdMapRef.current = {};
@@ -315,22 +325,49 @@ const Popup = ({ popupType, onClose, onSave, initialValues, images, onImageSelec
             <>
               <p className="my-6 text-2xl text-[var(--dark-text)] text-center">Of kies uit eerdere foto's</p>
               <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mb-6">
-                {recentImages.map((src, idx) => (
+                {recentImages.slice(currentPage * imagesPerPage, (currentPage + 1) * imagesPerPage).map((src, idx) => (
                   <button
                     key={`${src}-${idx}`}
                     type="button"
                     onClick={() => handleRecentImageSelect(src)}
-                    className="rounded-2xl overflow-hidden shadow hover:shadow-lg transition-shadow h-[9vw] w-[9vw] mb-6 mx-3 p-0"
-                    aria-label={`Kies foto ${idx + 1}`}
+                    className="rounded-2xl overflow-hidden shadow hover:shadow-lg transition-shadow h-[9vw] w-[9vw] mb-6 mx-3 p-0 bg-white"
+                    aria-label={`Kies foto ${currentPage * imagesPerPage + idx + 1}`}
                   >
                     <img
                       src={src}
-                      alt={`Recent ${idx + 1}`}
+                      alt={`Recent ${currentPage * imagesPerPage + idx + 1}`}
                       className="w-full h-full object-contain object-center"
                     />
                   </button>
                 ))}
               </div>
+              
+              {/* Pagination Controls */}
+              {recentImages.length > imagesPerPage && (
+                <div className="flex justify-center items-center gap-4 mb-4">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+                    disabled={currentPage === 0}
+                    className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--color-primary)]/80 transition-colors"
+                    aria-label="Vorige pagina"
+                  >
+                    <ChevronLeftIcon className="h-6 w-6" />
+                  </button>
+                  <span className="text-[var(--dark-text)]">
+                    {currentPage + 1} / {Math.ceil(recentImages.length / imagesPerPage)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(prev => Math.min(Math.ceil(recentImages.length / imagesPerPage) - 1, prev + 1))}
+                    disabled={currentPage >= Math.ceil(recentImages.length / imagesPerPage) - 1}
+                    className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--color-primary)]/80 transition-colors"
+                    aria-label="Volgende pagina"
+                  >
+                    <ChevronRightIcon className="h-6 w-6" />
+                  </button>
+                </div>
+              )}
             </>
           </>
         )}
@@ -472,7 +509,7 @@ const Popup = ({ popupType, onClose, onSave, initialValues, images, onImageSelec
                     if (!isNaN(parsedAmount) && parsedAmount > 0 && onSave) {
                       onSave(parsedAmount, shape, size);
                     } else if (isNaN(parsedAmount) || parsedAmount <= 0) {
-                      alert("Voer een geldig aantal in (groter dan 0)");
+                      showToast("Voer een geldig aantal in (groter dan 0)", "warning");
                     }
                   }}
                 />
@@ -500,6 +537,15 @@ const Popup = ({ popupType, onClose, onSave, initialValues, images, onImageSelec
           )}
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 };

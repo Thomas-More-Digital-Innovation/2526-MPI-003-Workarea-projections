@@ -18,7 +18,7 @@ const SHAPE_SIZES = {
   rectangle: {
     small: { width: 12, height: 6 },
     medium: { width: 18, height: 9 },
-    large: { width: 24, height: 12 },
+    large: { width: 48, height: 12 },
   },
 } as const;
 

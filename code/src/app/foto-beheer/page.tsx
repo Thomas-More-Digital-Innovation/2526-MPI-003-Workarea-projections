@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Plus, Upload, X } from 'lucide-react';
 import { Button, Footer } from '@/components';
+import Toast from '@/components/ui/Toast';
 
 export default function FotosBeheren() {
   const [images, setImages] = useState<Array<{ imageId: number; path: string; description: string }>>([]);
@@ -11,6 +12,11 @@ export default function FotosBeheren() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [imageToDelete, setImageToDelete] = useState<{ imageId: number; path: string; description: string } | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" | "warning" } | null>(null);
+
+  const showToast = (message: string, type: "success" | "error" | "info" | "warning" = "error") => {
+    setToast({ message, type });
+  };
 
   // Fetch images from database on mount
   const fetchImages = async () => {
@@ -51,7 +57,7 @@ export default function FotosBeheren() {
     if (window.electronAPI && window.electronAPI.addImage) {
       await window.electronAPI.addImage(fileData, description);
     } else {
-      alert('Electron API niet beschikbaar.');
+      showToast('Electron API niet beschikbaar.', 'error');
     }
     // Cleanup
     if (previewUrl) {
@@ -247,6 +253,15 @@ export default function FotosBeheren() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );

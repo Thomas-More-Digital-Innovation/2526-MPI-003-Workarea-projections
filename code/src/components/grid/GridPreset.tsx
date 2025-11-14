@@ -33,7 +33,7 @@ interface GridPresetProps {
 const GRID_CONFIG = {
   "rectangle-small": { rows: 3, cols: 5, maxPerPage: 15 },
   "rectangle-medium": { rows: 2, cols: 4, maxPerPage: 8 },
-  "rectangle-large": { rows: 2, cols: 3, maxPerPage: 6 },
+  "rectangle-large": { rows: 2, cols: 2, maxPerPage: 4 },
   "circle-small": { rows: 3, cols: 5, maxPerPage: 15 },
   "circle-medium": { rows: 2, cols: 4, maxPerPage: 8 },
   "circle-large": { rows: 1, cols: 4, maxPerPage: 4 },
