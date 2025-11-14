@@ -2,8 +2,9 @@
 
 import React, { useState } from 'react';
 import { Plus, Upload, X } from 'lucide-react';
-import { Button, Footer } from '@/components';
 import Toast from '@/components/ui/Toast';
+import { Button, Footer} from '@/components';
+import Header from '@/components/layout/Header';
 
 export default function FotosBeheren() {
   const [images, setImages] = useState<Array<{ imageId: number; path: string; description: string }>>([]);
@@ -79,17 +80,13 @@ export default function FotosBeheren() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-[var(--color-secondary)]/20">
+    <div className="flex flex-col h-screen bg-[var(--color-secondary)]/20">
       {/* Header - centered card */}
-      <div className="px-4 py-4">
-        <div className="mx-auto max-w rounded-2xl shadow-md" style={{ backgroundColor: 'var(--color-white)', padding: '0.75rem' }}>
-          <h1 className="text-center text-4xl px-6 py-3 font-semibold text-[var(--dark-text)]">Foto&apos;s Beheren</h1>
-        </div>
-      </div>
+      <Header text="Foto's Beheren" />
 
       {/* Content area - over volle breedte met padding aan zijkanten */}
-      <div className="flex-1 px-4">
-  <div className="rounded-2xl p-6 min-h-[38.7vw] overflow-y-auto shadow-sm" style={{ backgroundColor: 'var(--color-white)' }}>
+      <div className="flex-1 px-4 py-2 overflow-y-hidden">
+        <div className="rounded-2xl p-6 h-full overflow-y-auto shadow-md" style={{ backgroundColor: 'var(--color-white)' }}>
           <div className="grid grid-cols-8 gap-4 w-full scrollable">
             {/* Add Button as first grid cell */}
             <div className="w-full aspect-square rounded-2xl border border-dashed flex items-center justify-center hover:bg-white/60 transition-all bg-[var(--color-white)]">
@@ -124,12 +121,10 @@ export default function FotosBeheren() {
       </div>
 
       {/* Footer Buttons - over volle breedte */}
-      <div className="p-4">
-        <div className="w-full rounded-2xl shadow-md" style={{ backgroundColor: 'var(--color-white)' }}>
+      <div className="px-4 pt-2 pb-4">
           <Footer>
             <Button text="Terug" type="primary" onClick={handleTerug} fullWidth={false} fixedWidth={true} />
           </Footer>
-        </div>
       </div>
 
       {/* Delete Modal */}
