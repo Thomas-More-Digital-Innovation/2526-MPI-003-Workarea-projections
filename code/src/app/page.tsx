@@ -245,7 +245,7 @@ export default function Home() {
             fullWidth={false}
             fixedWidth={true}
           />
-          <Button
+           <Button
             type="primary"
             text={"Kalibratie"}
             onClick={handleCalibration}

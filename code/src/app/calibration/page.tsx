@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, GridPreset } from '@/components';
+import Toast from '@/components/ui/Toast';
 import { useRouter } from "next/navigation";
 import { useState, useRef, useEffect, useCallback } from 'react';
 
@@ -31,6 +32,11 @@ export default function CalibrationPage() {
   const [isCalibrated, setIsCalibrated] = useState(false);
   const [calibrationData, setCalibrationData] = useState<CalibrationData | null>(null);
   const router = useRouter();
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" | "warning" } | null>(null);
+
+  const showToast = (message: string, type: "success" | "error" | "info" | "warning" = "error") => {
+    setToast({ message, type });
+  };
 
   // Initialize webcam
   const startWebcam = useCallback(async () => {
@@ -62,16 +68,16 @@ export default function CalibrationPage() {
       console.error('Error accessing webcam:', error);
       if (error instanceof DOMException) {
         if (error.name === 'NotAllowedError') {
-          alert('Webcam access denied. Please allow camera permissions and try again.');
+          showToast('Webcam access denied. Please allow camera permissions and try again.', 'error');
         } else if (error.name === 'NotFoundError') {
-          alert('No webcam found. Please connect a camera and try again.');
+          showToast('No webcam found. Please connect a camera and try again.', 'error');
         } else if (error.name === 'NotReadableError') {
-          alert('Webcam is already in use by another application. Please close other camera applications and try again.');
+          showToast('Webcam is already in use by another application. Please close other camera applications and try again.', 'error');
         } else {
-          alert('Unable to access webcam. Please check your camera settings.');
+          showToast('Unable to access webcam. Please check your camera settings.', 'error');
         }
       } else {
-        alert('Unable to access webcam. Please check permissions and try again.');
+        showToast('Unable to access webcam. Please check permissions and try again.', 'error');
       }
     }
   }, []);
@@ -101,15 +107,25 @@ export default function CalibrationPage() {
     setDraggingPoint(null);
   }, []);
 
-  // Save calibration
-  const saveCalibration = () => {
+  // Apply calibration (preview only)
+  const handleApplyCalibration = () => {
     const data: CalibrationData = {
       points,
       aspectRatio: 16/9
     };
     setCalibrationData(data);
     setIsCalibrated(true);
+  };
+
+  // Save calibration and return to main page
+  const saveCalibration = () => {
+    const data: CalibrationData = {
+      points,
+      aspectRatio: 16/9
+    };
     localStorage.setItem('webcamCalibration', JSON.stringify(data));
+    // Navigate back to main page
+    router.push('/');
   };
 
   function getPerspectiveTransform(src: {x:number,y:number}[], dst: {x:number,y:number}[]) {
@@ -381,19 +397,28 @@ export default function CalibrationPage() {
         {/* Left 50% */}
         <div className="flex justify-between items-center">
           <Button onClick={() => router.push('/')} text="Terug" />
-          <Button onClick={resetCalibration} type='secondary' text="Reset Calibration" />
-          <Button onClick={saveCalibration} text="Save Calibration" />
-          
+          <Button onClick={resetCalibration} type='secondary' text="Reset Kalibratie" />
         </div>
 
         {/* Right 50% */}
-        <div className="flex justify-end items-center">
+        <div className="flex justify-end items-center gap-4">
+          {!isCalibrated && (
+            <Button onClick={handleApplyCalibration} text="Toepassen Kalibratie" />
+          )}
           {isCalibrated && (
-            <Button onClick={() => router.push('/projection')} text="Start Projectie" />
+            <Button onClick={saveCalibration} text="Kalibratie Opslaan" />
           )}
         </div>
-
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }

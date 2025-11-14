@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import GridPreset from "@/components/grid/GridPreset";
+import Toast from "@/components/ui/Toast";
 
 // --- Types -----------------------------------------------------------------
 interface Point {
@@ -51,7 +52,7 @@ interface Step {
 const GRID_CONFIG = {
   "rectangle-small": { rows: 3, cols: 5, maxPerPage: 15 },
   "rectangle-medium": { rows: 2, cols: 4, maxPerPage: 8 },
-  "rectangle-large": { rows: 2, cols: 3, maxPerPage: 6 },
+  "rectangle-large": { rows: 2, cols: 2, maxPerPage: 4 },
   "circle-small": { rows: 3, cols: 5, maxPerPage: 15 },
   "circle-medium": { rows: 2, cols: 4, maxPerPage: 8 },
   "circle-large": { rows: 1, cols: 4, maxPerPage: 4 },
@@ -111,12 +112,26 @@ export default function ProjectionPage() {
   const [currentImage, setCurrentImage] = useState<ImageData | null>(null);
   const [isImageStep, setIsImageStep] = useState(false);
 
+  // Image processing / detection tuning - hardcoded values
+  const exposure = 1; // multiplier
+  const gamma = 1; // gamma correction (1 = linear)
+  const contrast = 1; // contrast multiplier (1 = no change)
+  const brightnessOffset = 0; // additive offset
+  // detection tuning - hardcoded to requested values
+  const detectionThreshold = 201;
+  const detectionRatio = 0.3;
+
   // Countdown and flow
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isCountingDown, setIsCountingDown] = useState(false);
   const [isDone, setIsDone] = useState(false);
   const [isAllStepsComplete, setIsAllStepsComplete] = useState(false);
   const [waitingForClear, setWaitingForClear] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" | "warning" } | null>(null);
+
+  const showToast = (message: string, type: "success" | "error" | "info" | "warning" = "error") => {
+    setToast({ message, type });
+  };
 
   // --- Load steps and determine if grid or image ---
   useEffect(() => {
@@ -134,20 +149,20 @@ export default function ProjectionPage() {
       try {
         const api = (globalThis as any)?.electronAPI;
         if (!api?.getStepsByPreset) {
-          alert("Cannot load steps - API method not available");
+          showToast("Cannot load steps - API method not available", "error");
           router.push("/");
           return;
         }
 
         const steps: Step[] = await api.getStepsByPreset(Number(presetId));
         if (!steps || steps.length === 0) {
-          alert("No steps found for this preset");
+          showToast("No steps found for this preset", "error");
           router.push("/");
           return;
         }
 
         if (stepIndex >= steps.length) {
-          alert("All steps completed!");
+          showToast("All steps completed!", "success");
           router.push("/");
           return;
         }
@@ -166,7 +181,7 @@ export default function ProjectionPage() {
           const imageData = allImages.find((img: ImageData) => img.imageId === currentStep.imageId);
           
           if (!imageData) {
-            alert(`Image with ID ${currentStep.imageId} not found`);
+            showToast(`Image with ID ${currentStep.imageId} not found`, "error");
             router.push("/");
             return;
           }
@@ -184,7 +199,7 @@ export default function ProjectionPage() {
           localStorage.setItem("currentGridLayoutId", currentStep.gridLayoutId.toString());
 
           if (!api?.getGridLayouts) {
-            alert("Cannot load grid layout - API method not available");
+            showToast("Cannot load grid layout - API method not available", "error");
             router.push("/");
             return;
           }
@@ -195,7 +210,7 @@ export default function ProjectionPage() {
           );
 
           if (!gridLayoutFromDb) {
-            alert(`Grid layout with ID ${currentStep.gridLayoutId} not found in database`);
+            showToast(`Grid layout with ID ${currentStep.gridLayoutId} not found in database`, "error");
             router.push("/");
             return;
           }
@@ -232,12 +247,12 @@ export default function ProjectionPage() {
 
           console.log(`📊 Loaded grid: ${parsedLayout.amount} circles, ${calculatedTotalPages} pages, ${maxPerPage} per page`);
         } else {
-          alert("Step has no grid layout or image");
+          showToast("Step has no grid layout or image", "error");
           router.push("/");
           return;
         }
       } catch (err) {
-        alert(`Error loading step configuration: ${err}`);
+        showToast(`Error loading step configuration: ${err}`, "error");
         router.push("/");
       }
     };
@@ -454,7 +469,7 @@ export default function ProjectionPage() {
               const g = imageData[idx + 1];
               const b = imageData[idx + 2];
               const brightness = (r + g + b) / 3;
-              if (brightness < 180) darkPixels++;
+              if (brightness < detectionThreshold) darkPixels++;
             }
           }
         } else {
@@ -470,14 +485,14 @@ export default function ProjectionPage() {
                 const g = imageData[idx + 1];
                 const b = imageData[idx + 2];
                 const brightness = (r + g + b) / 3;
-                // slightly lower threshold to be more sensitive to darker items
-                if (brightness < 180) darkPixels++;
+                // use adjustable threshold
+                if (brightness < detectionThreshold) darkPixels++;
               }
             }
           }
         }
 
-        const isDetected = totalPixels > 0 && darkPixels / totalPixels > 0.3;
+  const isDetected = totalPixels > 0 && darkPixels / totalPixels > detectionRatio;
         if (isDetected) {
           console.log(`🔍 detect: page ${currentPage + 1} circle ${globalIndex} samples=${totalPixels} dark=${darkPixels} ratio=${(darkPixels/totalPixels).toFixed(2)}`);
         }
@@ -655,9 +670,36 @@ const generateCirclesForPage = (layout: GridLayout, count: number, maxPerPage: n
         if (ix >= 0 && iy >= 0 && ix < video.videoWidth && iy < video.videoHeight) {
           const srcIdx = (iy * video.videoWidth + ix) * 4;
           const dstIdx = (y * targetWidth + x) * 4;
-          dstData[dstIdx] = srcData[srcIdx];
-          dstData[dstIdx + 1] = srcData[srcIdx + 1];
-          dstData[dstIdx + 2] = srcData[srcIdx + 2];
+          // Read source pixel
+          let r = srcData[srcIdx];
+          let g = srcData[srcIdx + 1];
+          let b = srcData[srcIdx + 2];
+
+          // Apply exposure (scale)
+          r = r * exposure;
+          g = g * exposure;
+          b = b * exposure;
+
+          // Apply additive brightness offset
+          r = r + brightnessOffset;
+          g = g + brightnessOffset;
+          b = b + brightnessOffset;
+
+          // Apply contrast about mid-point 128
+          r = (r - 128) * contrast + 128;
+          g = (g - 128) * contrast + 128;
+          b = (b - 128) * contrast + 128;
+
+          // Apply gamma correction (avoid division by zero)
+          const gInv = gamma > 0 ? 1 / gamma : 1;
+          r = 255 * Math.pow(Math.max(0, Math.min(255, r)) / 255, gInv);
+          g = 255 * Math.pow(Math.max(0, Math.min(255, g)) / 255, gInv);
+          b = 255 * Math.pow(Math.max(0, Math.min(255, b)) / 255, gInv);
+
+          // Clamp and write back
+          dstData[dstIdx] = Math.max(0, Math.min(255, Math.round(r)));
+          dstData[dstIdx + 1] = Math.max(0, Math.min(255, Math.round(g)));
+          dstData[dstIdx + 2] = Math.max(0, Math.min(255, Math.round(b)));
           dstData[dstIdx + 3] = 255;
         }
       }
@@ -665,33 +707,10 @@ const generateCirclesForPage = (layout: GridLayout, count: number, maxPerPage: n
 
     ctx.putImageData(dstImage, 0, 0);
     
-    // DEBUG: Draw detection areas on canvas to visualize where we're checking
-    if (gridLayout) {
-      const key = `${gridLayout.shape}-${gridLayout.size}` as keyof typeof GRID_CONFIG;
-      const config = GRID_CONFIG[key];
-      const maxPerPage = config.maxPerPage;
-      const startIndex = currentPage * maxPerPage;
-      const endIndex = Math.min(startIndex + maxPerPage, gridLayout.amount);
-      const currentPageCount = endIndex - startIndex;
-      const pageCircles = generateCirclesForPage(gridLayout, currentPageCount, maxPerPage);
-      
-      ctx.strokeStyle = 'red';
-      ctx.lineWidth = 2;
-      pageCircles.forEach(circle => {
-        if (circle.shape === "rectangle" && circle.width && circle.height) {
-          ctx.strokeRect(
-            circle.x - circle.width / 2,
-            circle.y - circle.height / 2,
-            circle.width,
-            circle.height
-          );
-        } else {
-          ctx.beginPath();
-          ctx.arc(circle.x, circle.y, circle.radius, 0, 2 * Math.PI);
-          ctx.stroke();
-        }
-      });
-    }
+    // NOTE: Previously we drew red debug outlines on the canvas to visualize
+    // detection areas. Those overlays are not required in the projection view
+    // — keep the canvas image only and let the GridPreset DOM elements render
+    // the visible shapes (black / completed-green). Skipping debug drawing here.
     
     detectObjectsInCircles(dstData, targetWidth, targetHeight);
   }, [calibrationData, detectObjectsInCircles, gridLayout, currentPage]);
@@ -921,16 +940,12 @@ const generateCirclesForPage = (layout: GridLayout, count: number, maxPerPage: n
 
   // --- JSX -----------------------------------------------------------------
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center relative">
+    <div className="min-h-screen bg-white flex items-center justify-center relative overflow-hidden">
       {/* Hidden video (camera source) */}
       <video ref={videoRef} autoPlay muted playsInline className="hidden" />
 
-      {/* Debug canvas - shows transformed video with detection areas */}
-      <canvas 
-        ref={canvasRef} 
-        className="absolute top-0 left-0 w-full h-full object-contain opacity-50 pointer-events-none" 
-        style={{ zIndex: 1000, mixBlendMode: 'multiply' }}
-      />
+      {/* Canvas is hidden — we don't show the camera image in projection, only the DOM shapes */}
+      <canvas ref={canvasRef} className="hidden" aria-hidden="true" />
 
       {/* CONTENT: Image or Grid */}
       {isImageStep && currentImage ? (
@@ -978,7 +993,7 @@ const generateCirclesForPage = (layout: GridLayout, count: number, maxPerPage: n
 
       {/* Page advance countdown (for auto-advancing between pages) */}
       {!isImageStep && waitingForClear && !isDone && (
-        <div className="absolute inset-0 flex flex-col items-center justify-end pointer-events-none pb-32 gap-4">
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none gap-4">
           <div className="text-6xl font-bold text-yellow-500 drop-shadow-[0_0_20px_rgba(255,255,0,0.7)]">
             Verwijder alle items
           </div>
@@ -987,14 +1002,14 @@ const generateCirclesForPage = (layout: GridLayout, count: number, maxPerPage: n
 
       {/* Countdown display (5 seconds when page/all completed) */}
       {!isImageStep && countdown !== null && countdown > 0 && (
-        <div className="absolute inset-0 flex items-end justify-center pointer-events-none pb-32">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-9xl font-bold text-green-500 drop-shadow-[0_0_30px_rgba(0,255,0,0.7)]">{countdown}</div>
         </div>
       )}
 
       {/* Done display - waiting for items to be removed */}
       {!isImageStep && isDone && !isAllStepsComplete && (
-        <div className="absolute inset-0 flex flex-col items-center justify-end pointer-events-none pb-32 gap-4">
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none gap-4">
           <div className="text-6xl font-bold text-blue-500 drop-shadow-[0_0_20px_rgba(0,100,255,0.7)]">
             Verwijder alle items
           </div>
@@ -1003,7 +1018,7 @@ const generateCirclesForPage = (layout: GridLayout, count: number, maxPerPage: n
 
       {/* All steps complete display */}
       {isAllStepsComplete && (
-        <div className="absolute inset-0 flex items-end justify-center pointer-events-none pb-32">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-8xl font-bold text-green-500 drop-shadow-[0_0_30px_rgba(0,255,0,0.7)]">
             alle stappen zijn klaar
           </div>
@@ -1015,6 +1030,16 @@ const generateCirclesForPage = (layout: GridLayout, count: number, maxPerPage: n
         Stap {localStorage.getItem("currentStepIndex") ? Number(localStorage.getItem("currentStepIndex")) + 1 : 1}
       </div>
 
+      {/* Image tuning controls removed — using hardcoded values per request */}
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }
