@@ -203,7 +203,10 @@ const Popup = ({ popupType, onClose, onSave, initialValues, images, onImageSelec
       setIsProcessing(false);
     }
   };
-  const title = POPUP_TITLES[popupType] || "Popup";
+  let title = POPUP_TITLES[popupType] || "Popup";
+  if (popupType === 'gridPreset') {
+    title = initialValues ? 'Grid Bewerken' : 'Grid Toevoegen';
+  }
 
   React.useEffect(() => {
     if (popupType !== 'imageUpload') return;
@@ -253,6 +256,21 @@ const Popup = ({ popupType, onClose, onSave, initialValues, images, onImageSelec
   const [amount, setAmount] = useState("");
   const [shape, setShape] = useState<"circle" | "rectangle">("circle");
   const [size, setSize] = useState<"small" | "medium" | "large">("medium");
+
+  // Prefill fields when editing an existing grid
+  React.useEffect(() => {
+    if (popupType !== 'gridPreset') return;
+
+    if (initialValues) {
+      setAmount(String(initialValues.amount));
+      setShape(initialValues.shape);
+      setSize(initialValues.size);
+    } else {
+      setAmount("");
+      setShape("circle");
+      setSize("medium");
+    }
+  }, [popupType, initialValues]);
 
   const handleShapeChange = (value: string) => {
     if (value === "circle" || value === "rectangle") {
@@ -383,39 +401,44 @@ const Popup = ({ popupType, onClose, onSave, initialValues, images, onImageSelec
 
         {popupType === "exportImport" && (
           <div>
-            <div className="w-full flex justify-center">
-              <button
-                type="button"
-                onClick={handleImport}
-                onMouseEnter={() => setHoveredBox('import')}
-                onMouseLeave={() => setHoveredBox(null)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleImport(); } }}
-                disabled={isProcessing}
-                className="w-[95%] h-[25vw] m-2 flex justify-center items-center rounded-2xl shadow cursor-pointer transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ backgroundColor: hoveredBox === 'import' ? 'var(--hover-white)' : 'var(--color-white)' }}
+            <div className="flex justify-center">
+              <div
+                className="w-[60vw] max-h-[80vh] m-2"
+                style={{ aspectRatio: '33 / 16', display: 'flex', gap: '1rem' }}
               >
-                <div className="flex-col justify-center text-center">
-                  <ArrowDownOnSquareIcon className="h-30 w-30 text-[var(--color-primary)]"/>
-                  <p className="mt-4 text-4xl font-semibold">Import</p>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={handleExport}
-                onMouseEnter={() => setHoveredBox('export')}
-                onMouseLeave={() => setHoveredBox(null)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleExport(); } }}
-                disabled={isProcessing}
-                className="w-[95%] h-[25vw] m-2 flex justify-center items-center rounded-2xl shadow cursor-pointer transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ backgroundColor: hoveredBox === 'export' ? 'var(--hover-white)' : 'var(--color-white)' }}
-              >
-                <div className="flex-col justify-center text-center">
-                  <ArrowUpOnSquareIcon className="h-30 w-30 text-[var(--color-primary)]"/>
-                  <p className="mt-4 text-4xl font-semibold">Export</p>
-                </div>
-              </button>
+                <button
+                  type="button"
+                  onClick={handleImport}
+                  onMouseEnter={() => setHoveredBox('import')}
+                  onMouseLeave={() => setHoveredBox(null)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleImport(); } }}
+                  disabled={isProcessing}
+                  className="flex-1 h-full m-0 flex justify-center items-center rounded-2xl shadow cursor-pointer transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: hoveredBox === 'import' ? 'var(--hover-white)' : 'var(--color-white)' }}
+                >
+                  <div className="flex-col justify-center text-center">
+                    <ArrowDownOnSquareIcon className="h-30 w-30 text-[var(--color-primary)]"/>
+                    <p className="mt-4 text-4xl font-semibold">Import</p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExport}
+                  onMouseEnter={() => setHoveredBox('export')}
+                  onMouseLeave={() => setHoveredBox(null)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleExport(); } }}
+                  disabled={isProcessing}
+                  className="flex-1 h-full m-0 flex justify-center items-center rounded-2xl shadow cursor-pointer transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: hoveredBox === 'export' ? 'var(--hover-white)' : 'var(--color-white)' }}
+                >
+                  <div className="flex-col justify-center text-center">
+                    <ArrowUpOnSquareIcon className="h-30 w-30 text-[var(--color-primary)]"/>
+                    <p className="mt-4 text-4xl font-semibold">Export</p>
+                  </div>
+                </button>
+              </div>
             </div>
-            
+
             {exportImportMessage && (
               <div className="mt-4 p-3 bg-white rounded-lg text-center whitespace-pre-line">
                 <p className="text-[var(--dark-text)]">{exportImportMessage}</p>
@@ -482,7 +505,7 @@ const Popup = ({ popupType, onClose, onSave, initialValues, images, onImageSelec
 
           {popupType === "exportImport" && (
             <div className="flex justify-center">
-              <div className="w-[282px]">
+              <div className="w-[38vw]">
                 <Button type="secondary" text="Terug" onClick={onClose} />
               </div>
             </div>
