@@ -8,6 +8,17 @@ import { CloudArrowUpIcon, ArrowUpOnSquareIcon, ArrowDownOnSquareIcon, ChevronLe
 import InputField from "../forms/InputField";
 import GridPreset from "../grid/GridPreset";
 
+const GRID_CONFIG = {
+  "rectangle-small": { maxPerPage: 15 },
+  "rectangle-medium": { maxPerPage: 8 },
+  "rectangle-large": { maxPerPage: 4 },
+  "circle-small": { maxPerPage: 15 },
+  "circle-medium": { maxPerPage: 8 },
+  "circle-large": { maxPerPage: 4 },
+} as const;
+
+const MAX_PAGES = 10; // Maximum number of pages allowed
+
 type PopupProps = {
   popupType: string;
   onClose?: () => void;
@@ -267,6 +278,13 @@ const Popup = ({ popupType, onClose, onSave, initialValues, images, onImageSelec
   const [shape, setShape] = useState<"circle" | "rectangle">("circle");
   const [size, setSize] = useState<"small" | "medium" | "large">("medium");
 
+  // Calculate maximum allowed amount based on shape and size
+  const getMaxAmount = () => {
+    const key = `${shape}-${size}` as keyof typeof GRID_CONFIG;
+    const config = GRID_CONFIG[key];
+    return config.maxPerPage * MAX_PAGES;
+  };
+
   // Prefill fields when editing an existing grid
   React.useEffect(() => {
     if (popupType !== 'gridPreset') return;
@@ -397,9 +415,18 @@ const Popup = ({ popupType, onClose, onSave, initialValues, images, onImageSelec
                 <InputField
                   type="textField"
                   label="Aantal"
-                  hint="Aantal vormen"
+                  hint={`Aantal vormen (max ${getMaxAmount()})`}
                   value={amount}
-                  onChange={setAmount}
+                  onChange={(value) => {
+                    const numValue = parseInt(value, 10);
+                    const maxAmount = getMaxAmount();
+                    if (value === "" || (!isNaN(numValue) && numValue <= maxAmount)) {
+                      setAmount(value);
+                    } else if (!isNaN(numValue) && numValue > maxAmount) {
+                      showToast(`Maximum aantal is ${maxAmount} voor ${shape} ${size}`, "warning");
+                      setAmount(String(maxAmount));
+                    }
+                  }}
                 />
 
                 <InputField
@@ -529,10 +556,13 @@ const Popup = ({ popupType, onClose, onSave, initialValues, images, onImageSelec
                   text="Opslaan" 
                   onClick={() => {
                     const parsedAmount = parseInt(amount, 10);
-                    if (!isNaN(parsedAmount) && parsedAmount > 0 && onSave) {
-                      onSave(parsedAmount, shape, size);
-                    } else if (isNaN(parsedAmount) || parsedAmount <= 0) {
+                    const maxAmount = getMaxAmount();
+                    if (isNaN(parsedAmount) || parsedAmount <= 0) {
                       showToast("Voer een geldig aantal in (groter dan 0)", "warning");
+                    } else if (parsedAmount > maxAmount) {
+                      showToast(`Maximum aantal is ${maxAmount} voor ${shape} ${size}`, "warning");
+                    } else if (onSave) {
+                      onSave(parsedAmount, shape, size);
                     }
                   }}
                 />

@@ -28,6 +28,8 @@ interface GridPresetProps {
   // Custom gap values in rem units for row and column gaps
   rowGapRem?: number;
   colGapRem?: number;
+  // Maximum number of shapes to display (useful for limiting large grids)
+  maxShapes?: number;
 }
 
 const GRID_CONFIG = {
@@ -54,11 +56,16 @@ const GridPreset: React.FC<GridPresetProps> = ({
   positions, // Optional absolute positions
   rowGapRem, // Custom row gap in rem
   colGapRem, // Custom column gap in rem
+  maxShapes, // Maximum shapes to display
 }) => {
   const key = `${shape}-${size}`;
   const config = GRID_CONFIG[key as keyof typeof GRID_CONFIG];
+  
+  // Apply maxShapes limiter if provided
+  const limitedTotal = maxShapes !== undefined ? Math.min(total, maxShapes) : total;
+  
   const effectivePerPage = Math.min(perPage, config.maxPerPage);
-  const totalPages = Math.ceil(total / effectivePerPage);
+  const totalPages = Math.ceil(limitedTotal / effectivePerPage);
 
   const [page, setPage] = useState<number>(currentPage ?? 0);
 
@@ -86,8 +93,8 @@ const GridPreset: React.FC<GridPresetProps> = ({
   }, [page, onPageChange, currentPage]);
 
   const startIndex = page * effectivePerPage;
-  const endIndex = Math.min(startIndex + effectivePerPage, total);
-  const shapesArray = Array.from({ length: total }).slice(startIndex, endIndex);
+  const endIndex = Math.min(startIndex + effectivePerPage, limitedTotal);
+  const shapesArray = Array.from({ length: limitedTotal }).slice(startIndex, endIndex);
 
   const showArrows = pagination && totalPages > 1 && scale !== 1;
 
