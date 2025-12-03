@@ -410,8 +410,7 @@ export default function ProjectionPage() {
     return x;
   }
 
-  // --- Detection function ---
-  const detectObjectsInCircles = useCallback(
+ const detectObjectsInCircles = useCallback(
     (imageData: Uint8ClampedArray, width: number, height: number) => {
       if (!gridLayout) return;
 
@@ -427,39 +426,38 @@ export default function ProjectionPage() {
       // Generate circles for current page only
       const pageCircles = generateCirclesForPage(gridLayout, currentPageCount, maxPerPage);
 
-  const newCircleStates = [...circleStatesRef.current];
-  let hasChanges = false;
-  // Debug: log page info occasionally
-  // console.log(`detect: page=${currentPage+1} start=${startIndex} end=${endIndex} count=${pageCircles.length}`);
+      const newCircleStates = [...circleStatesRef.current];
+      let hasChanges = false;
+
       pageCircles.forEach((circle, localIndex) => {
         const globalIndex = startIndex + localIndex;
 
-  // Skip detection for permanently completed circles
-  if (permanentCompletedRef.current[globalIndex]) return;
+        // Skip detection for permanently completed circles
+        if (permanentCompletedRef.current[globalIndex]) return;
+        // METHOD 1: Brightness/Darkness Detection 
+        let totalPixels = 0;
+        let darkPixels = 0;
+        const step = 2; // Reduced step for better sampling
+        // METHOD 2: Edge Detection (detects object boundaries)
+        let edgePixels = 0;
+        // METHOD 3: Variance Detection (uniform vs varied regions)
+        let sumBrightness = 0;
+        let sumBrightnessSq = 0;
+        // METHOD 4: Color Variance (detect non-white objects)
+        let colorVariance = 0;
+        // METHOD 5: Center-weighted detection (more weight to center)
+        let centerDarkPixels = 0;
+        let centerTotalPixels = 0;
 
-        // ONLY detect changes for circles on the CURRENT page
-        // Don't touch circles from other pages at all
+        // Collect pixel data
+        const pixelData: number[] = [];
 
-  let totalPixels = 0;
-  let darkPixels = 0;
-  // sampling step - smaller value = more samples, more CPU but better
-  // sensitivity on subsequent pages
-  const step = 3;
-
-        // Use different detection logic based on shape
         if (circle.shape === "rectangle" && circle.width && circle.height) {
-          // Rectangle detection: check pixels within the rectangular bounds
+          // Rectangle detection
           const halfWidth = circle.width / 2;
           const halfHeight = circle.height / 2;
-          
-          // Debug: log rectangle bounds for first rectangle
-          if (globalIndex === startIndex) {
-            console.log(`🔍 Rectangle ${globalIndex} detection area:`);
-            console.log(`   Center: (${circle.x.toFixed(1)}, ${circle.y.toFixed(1)})`);
-            console.log(`   Size: ${circle.width.toFixed(1)}×${circle.height.toFixed(1)}px`);
-            console.log(`   Bounds: X[${(circle.x - halfWidth).toFixed(1)} to ${(circle.x + halfWidth).toFixed(1)}]`);
-            console.log(`   Bounds: Y[${(circle.y - halfHeight).toFixed(1)} to ${(circle.y + halfHeight).toFixed(1)}]`);
-          }
+          const quarterWidth = circle.width / 4;
+          const quarterHeight = circle.height / 4;
           
           for (let y = Math.max(0, Math.floor(circle.y - halfHeight)); y <= Math.min(height - 1, Math.floor(circle.y + halfHeight)); y += step) {
             for (let x = Math.max(0, Math.floor(circle.x - halfWidth)); x <= Math.min(width - 1, Math.floor(circle.x + halfWidth)); x += step) {
@@ -469,33 +467,154 @@ export default function ProjectionPage() {
               const g = imageData[idx + 1];
               const b = imageData[idx + 2];
               const brightness = (r + g + b) / 3;
+              
+              // Method 1: Darkness
               if (brightness < detectionThreshold) darkPixels++;
+              
+              // Method 2: Edge detection (Sobel-like)
+              if (x > 0 && y > 0 && x < width - 1 && y < height - 1) {
+                const idxLeft = (y * width + (x - 1)) * 4;
+                const idxRight = (y * width + (x + 1)) * 4;
+                const idxTop = ((y - 1) * width + x) * 4;
+                const idxBottom = ((y + 1) * width + x) * 4;
+                
+                const bLeft = (imageData[idxLeft] + imageData[idxLeft + 1] + imageData[idxLeft + 2]) / 3;
+                const bRight = (imageData[idxRight] + imageData[idxRight + 1] + imageData[idxRight + 2]) / 3;
+                const bTop = (imageData[idxTop] + imageData[idxTop + 1] + imageData[idxTop + 2]) / 3;
+                const bBottom = (imageData[idxBottom] + imageData[idxBottom + 1] + imageData[idxBottom + 2]) / 3;
+                
+                const gradX = Math.abs(bRight - bLeft);
+                const gradY = Math.abs(bBottom - bTop);
+                const gradient = Math.sqrt(gradX * gradX + gradY * gradY);
+                
+                if (gradient > 30) edgePixels++;
+              }
+              
+              // Method 3: Variance
+              sumBrightness += brightness;
+              sumBrightnessSq += brightness * brightness;
+              pixelData.push(brightness);
+              
+              // Method 4: Color variance
+              const avgColor = (r + g + b) / 3;
+              colorVariance += Math.abs(r - avgColor) + Math.abs(g - avgColor) + Math.abs(b - avgColor);
+              
+              // Method 5: Center-weighted
+              const distX = Math.abs(x - circle.x);
+              const distY = Math.abs(y - circle.y);
+              if (distX < quarterWidth && distY < quarterHeight) {
+                centerTotalPixels++;
+                if (brightness < detectionThreshold) centerDarkPixels++;
+              }
             }
           }
         } else {
-          // Circle detection: check pixels within the circular bounds
+          // Circle detection
+          const quarterRadius = circle.radius / 2;
+          
           for (let y = Math.max(0, Math.floor(circle.y - circle.radius)); y <= Math.min(height - 1, Math.floor(circle.y + circle.radius)); y += step) {
             for (let x = Math.max(0, Math.floor(circle.x - circle.radius)); x <= Math.min(width - 1, Math.floor(circle.x + circle.radius)); x += step) {
               const dx = x - circle.x;
               const dy = y - circle.y;
-              if (dx * dx + dy * dy <= circle.radius * circle.radius) {
+              const distSq = dx * dx + dy * dy;
+              
+              if (distSq <= circle.radius * circle.radius) {
                 totalPixels++;
                 const idx = (y * width + x) * 4;
                 const r = imageData[idx];
                 const g = imageData[idx + 1];
                 const b = imageData[idx + 2];
                 const brightness = (r + g + b) / 3;
-                // use adjustable threshold
+                
+                // Method 1: Darkness
                 if (brightness < detectionThreshold) darkPixels++;
+                
+                // Method 2: Edge detection
+                if (x > 0 && y > 0 && x < width - 1 && y < height - 1) {
+                  const idxLeft = (y * width + (x - 1)) * 4;
+                  const idxRight = (y * width + (x + 1)) * 4;
+                  const idxTop = ((y - 1) * width + x) * 4;
+                  const idxBottom = ((y + 1) * width + x) * 4;
+                  
+                  const bLeft = (imageData[idxLeft] + imageData[idxLeft + 1] + imageData[idxLeft + 2]) / 3;
+                  const bRight = (imageData[idxRight] + imageData[idxRight + 1] + imageData[idxRight + 2]) / 3;
+                  const bTop = (imageData[idxTop] + imageData[idxTop + 1] + imageData[idxTop + 2]) / 3;
+                  const bBottom = (imageData[idxBottom] + imageData[idxBottom + 1] + imageData[idxBottom + 2]) / 3;
+                  
+                  const gradX = Math.abs(bRight - bLeft);
+                  const gradY = Math.abs(bBottom - bTop);
+                  const gradient = Math.sqrt(gradX * gradX + gradY * gradY);
+                  
+                  if (gradient > 30) edgePixels++;
+                }
+                
+                // Method 3: Variance
+                sumBrightness += brightness;
+                sumBrightnessSq += brightness * brightness;
+                pixelData.push(brightness);
+                
+                // Method 4: Color variance
+                const avgColor = (r + g + b) / 3;
+                colorVariance += Math.abs(r - avgColor) + Math.abs(g - avgColor) + Math.abs(b - avgColor);
+                
+                // Method 5: Center-weighted
+                if (distSq <= quarterRadius * quarterRadius) {
+                  centerTotalPixels++;
+                  if (brightness < detectionThreshold) centerDarkPixels++;
+                }
               }
             }
           }
         }
-
-  const isDetected = totalPixels > 0 && darkPixels / totalPixels > detectionRatio;
-        if (isDetected) {
-          console.log(`🔍 detect: page ${currentPage + 1} circle ${globalIndex} samples=${totalPixels} dark=${darkPixels} ratio=${(darkPixels/totalPixels).toFixed(2)}`);
+        // Calculate detection metrics
+        
+        // Method 1: Basic darkness ratio
+        const darknessRatio = totalPixels > 0 ? darkPixels / totalPixels : 0;
+        const method1Detected = darknessRatio > detectionRatio;
+        
+        // Method 2: Edge detection ratio
+        const edgeRatio = totalPixels > 0 ? edgePixels / totalPixels : 0;
+        const method2Detected = edgeRatio > 0.15; // 15% of pixels showing edges
+        
+        // Method 3: Brightness variance (high variance = object present)
+        const mean = totalPixels > 0 ? sumBrightness / totalPixels : 0;
+        const variance = totalPixels > 0 ? (sumBrightnessSq / totalPixels - mean * mean) : 0;
+        const method3Detected = variance > 1000; // Significant brightness variation
+        
+        // Method 4: Color variance (colored objects vs white background)
+        const avgColorVariance = totalPixels > 0 ? colorVariance / totalPixels : 0;
+        const method4Detected = avgColorVariance > 20; // Colors differ from grayscale
+        
+        // Method 5: Center-weighted detection (object in center)
+        const centerDarknessRatio = centerTotalPixels > 0 ? centerDarkPixels / centerTotalPixels : 0;
+        const method5Detected = centerDarknessRatio > (detectionRatio + 0.1); // Stricter for center
+        
+        // Combined detection decision (voting system)
+        const detectionVotes = [
+          method1Detected ? 2 : 0,  // Darkness gets 2 votes (most reliable)
+          method2Detected ? 1 : 0,  // Edge detection gets 1 vote
+          method3Detected ? 1 : 0,  // Variance gets 1 vote
+          method4Detected ? 1 : 0,  // Color variance gets 1 vote
+          method5Detected ? 2 : 0,  // Center-weighted gets 2 votes (very reliable)
+        ];
+        
+        const totalVotes = detectionVotes.reduce((a, b) => a + b, 0);
+        const isDetected = totalVotes >= 3; // Need at least 3 votes to detect
+        
+        // Enhanced logging for debugging
+        if (isDetected || newCircleStates[globalIndex]) {
+          console.log(`🔍 Circle ${globalIndex} detection:`, {
+            page: currentPage + 1,
+            darkness: `${(darknessRatio * 100).toFixed(1)}% (${method1Detected ? '✓' : '✗'})`,
+            edges: `${(edgeRatio * 100).toFixed(1)}% (${method2Detected ? '✓' : '✗'})`,
+            variance: `${variance.toFixed(0)} (${method3Detected ? '✓' : '✗'})`,
+            colorVar: `${avgColorVariance.toFixed(1)} (${method4Detected ? '✓' : '✗'})`,
+            centerDark: `${(centerDarknessRatio * 100).toFixed(1)}% (${method5Detected ? '✓' : '✗'})`,
+            votes: totalVotes,
+            detected: isDetected
+          });
         }
+
         if (newCircleStates[globalIndex] !== isDetected) {
           newCircleStates[globalIndex] = isDetected;
           hasChanges = true;
