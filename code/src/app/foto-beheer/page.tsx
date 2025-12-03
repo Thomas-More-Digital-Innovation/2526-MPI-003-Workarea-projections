@@ -2,9 +2,9 @@
 
 import React, { useState } from 'react';
 import { Plus, Upload, X } from 'lucide-react';
-import Toast from '@/components/ui/Toast';
 import { Button, Footer} from '@/components';
 import Header from '@/components/layout/Header';
+import Toast from '@/components/ui/Toast';
 
 export default function FotosBeheren() {
   const [images, setImages] = useState<Array<{ imageId: number; path: string; description: string }>>([]);
