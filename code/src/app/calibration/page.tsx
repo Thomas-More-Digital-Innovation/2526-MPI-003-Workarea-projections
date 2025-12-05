@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, GridPreset } from '@/components';
+import { Button, GridPreset, Footer } from '@/components';
 import Toast from '@/components/ui/Toast';
 import { useRouter } from "next/navigation";
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -393,22 +393,41 @@ export default function CalibrationPage() {
         </div>
       </div>
 
-      <div className="bg-white shadow-md border border-gray-200 grid grid-cols-2 gap-4 px-3 py-3 m-2 relative rounded-2xl">
-        {/* Left 50% */}
-        <div className="flex justify-between items-center">
-          <Button onClick={() => router.push('/')} text="Terug" />
-          <Button onClick={resetCalibration} type='secondary' text="Reset Kalibratie" />
-        </div>
-
-        {/* Right 50% */}
-        <div className="flex justify-end items-center gap-4">
+      <div className="p-4">
+        <Footer>
+          <Button 
+            onClick={() => router.push('/')} 
+            text="Terug" 
+            type="secondary"
+            fullWidth={false}
+            fixedWidth={true}
+          />
+          <Button 
+            onClick={resetCalibration} 
+            type='secondary' 
+            text="Reset Kalibratie"
+            fullWidth={false}
+            fixedWidth={true}
+          />
           {!isCalibrated && (
-            <Button onClick={handleApplyCalibration} text="Toepassen Kalibratie" />
+            <Button 
+              onClick={handleApplyCalibration} 
+              text="Toepassen Kalibratie"
+              type="primary"
+              fullWidth={false}
+              fixedWidth={true}
+            />
           )}
           {isCalibrated && (
-            <Button onClick={saveCalibration} text="Kalibratie Opslaan" />
+            <Button 
+              onClick={saveCalibration} 
+              text="Kalibratie Opslaan"
+              type="primary"
+              fullWidth={false}
+              fixedWidth={true}
+            />
           )}
-        </div>
+        </Footer>
       </div>
 
       {/* Toast Notification */}
