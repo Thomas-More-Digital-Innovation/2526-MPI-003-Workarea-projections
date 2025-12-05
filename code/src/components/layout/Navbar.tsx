@@ -64,7 +64,7 @@ const Navbar: React.FC<NavbarProps> = ({ searchQuery = "", onSearchChange }) => 
       </div>
       {/* Popup overlay (always on top) */}
       {showPopup && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 bg-opacity-40">
+        <div className="fixed inset-0 flex items-center justify-center bg-black/50 bg-opacity-40 z-50">
           <Popup popupType="exportImport" onClose={handleClosePopup} />
         </div>
       )}

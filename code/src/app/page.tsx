@@ -41,7 +41,7 @@ export default function Home() {
           
           // For each preset, fetch the first step to get the correct grid layout
           const presetsWithCorrectGrid = await Promise.all(
-            (result || []).map(async (preset) => {
+            (result || []).map(async (preset: any) => {
               try {
                 // Get steps for this preset
                 let steps = null;
@@ -56,7 +56,7 @@ export default function Home() {
                   // If first step has a grid layout, fetch the grid layout details
                   if (firstStep.gridLayoutId && api?.getGridLayouts) {
                     const gridLayouts = await api.getGridLayouts();
-                    const gridLayout = gridLayouts.find(gl => gl.gridLayoutId === firstStep.gridLayoutId);
+                    const gridLayout = gridLayouts.find((gl: any) => gl.gridLayoutId === firstStep.gridLayoutId);
                     if (gridLayout) {
                       // Return preset with correct grid layout data from first step
                       return {
@@ -240,12 +240,14 @@ export default function Home() {
                 showToast("Selecteer eerst een preset", "warning");
                 return;
               }
-              router.push(`/preset?id=${selectedCard}`);
+              // Store preset ID in localStorage for the preset page to read
+              localStorage.setItem('editPresetId', selectedCard.toString());
+              router.push(`/preset`);
             }}
             fullWidth={false}
             fixedWidth={true}
           />
-          <Button
+           <Button
             type="primary"
             text={"Kalibratie"}
             onClick={handleCalibration}

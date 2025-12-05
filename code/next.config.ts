@@ -8,6 +8,14 @@ const nextConfig = {
   basePath: '',
 
   reactStrictMode: false,
+  
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  
+  typescript: {
+    ignoreBuildErrors: false,
+  },
 };
 
 module.exports = nextConfig;

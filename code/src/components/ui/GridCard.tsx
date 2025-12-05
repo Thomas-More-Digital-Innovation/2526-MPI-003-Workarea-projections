@@ -60,10 +60,10 @@ const GridCard = ({ id, title, description, preset, active = false, onSelect }: 
             </div>
 
             {/* Text area */}
-            <div className="mt-4 flex flex-col gap-2">
-                <p className={`font-semibold text-xl text-[var(--dark-text)]`}>{title}</p>
-                <hr className="border-black/50 border-1" />
-                <p className={`text-[var(--color-text)] text-sm`}>{description}</p>
+            <div className="mt-4 flex flex-col gap-2 flex-1 min-h-0 overflow-hidden">
+                <p className={`font-semibold text-xl text-[var(--dark-text)] line-clamp-2`}>{title}</p>
+                <hr className="border-black/50 border-1 flex-shrink-0" />
+                <p className={`text-[var(--color-text)] text-sm line-clamp-3 overflow-hidden`}>{description}</p>
             </div>
         </button>
     );
