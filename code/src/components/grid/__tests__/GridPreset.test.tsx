@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import GridPreset from '@/components/grid/GridPreset';
 
 describe('GridPreset Component', () => {
+  // Test: Grid renders with the specified number of shapes
   it('renders grid with correct number of shapes', () => {
     const { container } = render(
       <GridPreset
@@ -16,6 +17,7 @@ describe('GridPreset Component', () => {
     expect(container.firstChild).toBeInTheDocument();
   });
 
+  // Test: maxShapes prop limits the total number of shapes displayed
   it('respects maxShapes limiter', () => {
     render(
       <GridPreset
@@ -31,6 +33,7 @@ describe('GridPreset Component', () => {
     expect(screen.queryByText('Pagina')).not.toBeInTheDocument();
   });
 
+  // Test: Pagination controls appear when needed (multiple pages, scale=1)
   it('shows pagination controls when pagination is enabled and multiple pages exist', () => {
     const { container } = render(
       <GridPreset
@@ -46,6 +49,7 @@ describe('GridPreset Component', () => {
     expect(container).toBeInTheDocument();
   });
 
+  // Test: Grid renders correctly with different scale values
   it('handles different scales correctly', () => {
     const { container } = render(
       <GridPreset
@@ -61,6 +65,7 @@ describe('GridPreset Component', () => {
     expect(container.firstChild).toBeInTheDocument();
   });
 
+  // Test: Rectangle shapes render with proper configuration
   it('renders rectangles with correct configuration', () => {
     const { container } = render(
       <GridPreset
@@ -74,6 +79,7 @@ describe('GridPreset Component', () => {
     expect(container.firstChild).toBeInTheDocument();
   });
 
+  // Test: Completed shapes display with green border styling
   it('handles completed states correctly', () => {
     const completedStates = [true, false, true, false];
     

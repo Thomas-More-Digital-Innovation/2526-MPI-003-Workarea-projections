@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain } from 'electron';
+import { app, BrowserWindow, globalShortcut, ipcMain, protocol } from 'electron';
 import path from 'path';
 import url from 'url';
 import Database from 'better-sqlite3';
@@ -8,8 +8,14 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ✅ Correct database path (../data/app.db relative to dist)
-const dbPath = path.join(__dirname, '../data/app.db');
+// ✅ Correct database path for both development and production
+// In production, app.getPath('userData') gives us a writable location
+// In development, we use the data folder in the project
+const isDev = !app.isPackaged;
+const dbPath = isDev 
+  ? path.join(__dirname, '../data/app.db')
+  : path.join(app.getPath('userData'), 'data', 'app.db');
+
 if (!fs.existsSync(path.dirname(dbPath))) {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 }
@@ -110,10 +116,19 @@ ipcMain.handle('images:delete', (event, imageId) => {
     db.prepare('DELETE FROM Step WHERE imageId = ?').run(imageId);
     db.prepare('DELETE FROM Image WHERE imageId = ?').run(imageId);
 
-    const resolved = path.resolve(__dirname, '..', img.path);
-    const publicDir = path.resolve(__dirname, '..', 'public');
-    if (resolved.startsWith(publicDir) && fs.existsSync(resolved)) {
-      fs.unlinkSync(resolved);
+    // In production, img.path is an absolute path; in dev, it's relative
+    let imagePath;
+    if (isDev) {
+      imagePath = path.resolve(__dirname, '..', img.path);
+      const publicDir = path.resolve(__dirname, '..', 'public');
+      if (imagePath.startsWith(publicDir) && fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
+    } else {
+      // In production, path is already absolute
+      if (fs.existsSync(img.path)) {
+        fs.unlinkSync(img.path);
+      }
     }
     return { success: true };
   } catch (err) {
@@ -122,18 +137,45 @@ ipcMain.handle('images:delete', (event, imageId) => {
   }
 });
 
+// Add handler to get image file data for display
+ipcMain.handle('images:getFile', (event, imagePath) => {
+  try {
+    let fullPath;
+    if (isDev) {
+      fullPath = path.resolve(__dirname, '..', imagePath);
+    } else {
+      // In production, imagePath is already absolute
+      fullPath = imagePath;
+    }
+    
+    if (fs.existsSync(fullPath)) {
+      const data = fs.readFileSync(fullPath);
+      return { success: true, data: data.toString('base64') };
+    } else {
+      return { success: false, error: 'Image file not found' };
+    }
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
 ipcMain.handle('images:addFile', async (event, file, description) => {
-  const imagesDir = path.join(__dirname, '../public/images');
+  // Use userData directory for storing uploaded images in production
+  const imagesDir = isDev 
+    ? path.join(__dirname, '../public/images')
+    : path.join(app.getPath('userData'), 'images');
+  
   if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true });
 
   const filePath = path.join(imagesDir, file.name);
   fs.writeFileSync(filePath, Buffer.from(file.buffer));
 
-  const relPath = `images/${file.name}`;
+  // Store the full absolute path in production so we can retrieve it later
+  const storedPath = isDev ? `images/${file.name}` : filePath;
   const stmt = db.prepare('INSERT INTO Image (path, description) VALUES (?, ?)');
-  const info = stmt.run(relPath, description);
+  const info = stmt.run(storedPath, description);
 
-  return { imageId: info.lastInsertRowid, path: relPath, description };
+  return { imageId: info.lastInsertRowid, path: storedPath, description };
 });
 
 //
@@ -364,17 +406,57 @@ function createWindow() {
 
   mainWindow.maximize();
 
-  if (process.env.NODE_ENV === 'development') {
+  const isDev = process.env.NODE_ENV === 'development';
+  
+  if (isDev) {
     mainWindow.loadURL('http://localhost:3000');
   } else {
-    mainWindow.loadURL(
-      url.format({
-        pathname: path.join(__dirname, '../out/index.html'),
-        protocol: 'file:',
-        slashes: true,
-      })
-    );
+    mainWindow.loadFile(path.join(__dirname, '../out/index.html'));
   }
+
+  // Handle navigation for both will-navigate and new-window events
+  const handleNavigation = (event, navigationUrl) => {
+    const parsedUrl = new URL(navigationUrl);
+    
+    // Only handle file protocol or when trying to navigate within the app
+    if (parsedUrl.protocol === 'file:') {
+      event.preventDefault();
+      
+      // Extract the route path
+      let routePath = parsedUrl.pathname;
+      
+      // Remove file extension artifacts and clean path
+      routePath = routePath.replace(/\.txt$/, '').replace(/\.html$/, '');
+      
+      // Remove leading slash on Windows and clean up
+      if (process.platform === 'win32' && routePath.startsWith('/')) {
+        routePath = routePath.substring(1);
+      }
+      
+      // Remove any drive letters (C:, D:, etc.)
+      routePath = routePath.replace(/^[A-Z]:/i, '');
+      
+      // Get just the last segment (the actual page name)
+      const segments = routePath.split('/').filter(s => s && s !== 'out');
+      const pageName = segments[segments.length - 1] || 'index';
+      
+      // Map route to HTML file
+      const htmlFile = path.join(__dirname, '../out', `${pageName}.html`);
+      
+      // Check if file exists, otherwise load index
+      if (fs.existsSync(htmlFile)) {
+        mainWindow.loadFile(htmlFile);
+      } else {
+        mainWindow.loadFile(path.join(__dirname, '../out/index.html'));
+      }
+    }
+  };
+
+  mainWindow.webContents.on('will-navigate', handleNavigation);
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    handleNavigation({ preventDefault: () => {} }, url);
+    return { action: 'deny' };
+  });
 
   return mainWindow;
 }

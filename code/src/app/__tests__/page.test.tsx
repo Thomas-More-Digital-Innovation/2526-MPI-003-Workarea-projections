@@ -7,6 +7,7 @@ describe('Home Page Integration Tests', () => {
     localStorage.clear();
   });
 
+  // Test: Verifies that the homepage loads and displays the main title
   it('renders the main page with title', async () => {
     global.electronAPI.getPresetsWithGridLayouts.mockResolvedValue([]);
     
@@ -17,6 +18,7 @@ describe('Home Page Integration Tests', () => {
     expect(screen.getByText('MPI Projectie Tool')).toBeInTheDocument();
   });
 
+  // Test: When no presets exist, shows the empty state message
   it('displays empty state when no presets are available', async () => {
     global.electronAPI.getPresetsWithGridLayouts.mockResolvedValue([]);
     
@@ -29,6 +31,7 @@ describe('Home Page Integration Tests', () => {
     });
   });
 
+  // Test: Loads preset data from the electronAPI and displays preset cards
   it('loads and displays presets from API', async () => {
     const mockPresets = [
       {
@@ -64,6 +67,7 @@ describe('Home Page Integration Tests', () => {
     });
   });
 
+  // Test: Clicking a preset card selects it and applies active styling
   it('selects a preset when clicking on card', async () => {
     const mockPresets = [
       {
@@ -96,6 +100,7 @@ describe('Home Page Integration Tests', () => {
     expect(card).toHaveClass('bg-[var(--color-primary)]/50');
   });
 
+  // Test: Starting without a selected preset shows a warning toast
   it('shows warning when starting without selecting a preset', async () => {
     global.electronAPI.getPresetsWithGridLayouts.mockResolvedValue([]);
 
@@ -113,6 +118,7 @@ describe('Home Page Integration Tests', () => {
     });
   });
 
+  // Test: Search functionality filters presets by name or description
   it('filters presets based on search query', async () => {
     const mockPresets = [
       {
@@ -158,6 +164,7 @@ describe('Home Page Integration Tests', () => {
     });
   });
 
+  // Test: Clicking the Kalibratie button navigates to the calibration page
   it('navigates to calibration page when clicking Kalibratie button', async () => {
     global.electronAPI.getPresetsWithGridLayouts.mockResolvedValue([]);
 

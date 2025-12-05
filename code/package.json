@@ -6,13 +6,47 @@
   "main": "electron/main.mjs",
   "build": {
     "appId": "com.digital-innovation.work-area-projection",
+    "productName": "Work Area Projection",
     "files": [
-      "out/",
-      "electron/"
+      "out/**/*",
+      "electron/**/*",
+      "public/**/*",
+      "data/**/*",
+      "package.json",
+      "node_modules/better-sqlite3/**/*"
+    ],
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*"
     ],
     "directories": {
-      "buildResources": "assets"
-    }
+      "buildResources": "public",
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "public/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "extraResources": [
+      {
+        "from": "data",
+        "to": "data",
+        "filter": ["**/*"]
+      }
+    ],
+    "fileAssociations": [],
+    "npmRebuild": false
   },
   "scripts": {
     "dev": "next dev",
@@ -21,6 +55,9 @@
     "start": "next start",
     "electron-dev": "cross-env NODE_ENV=development concurrently \"npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
     "electron-build": "npm run build && electron .",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder --win",
+    "dist:all": "npm run build && electron-builder -mwl",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"

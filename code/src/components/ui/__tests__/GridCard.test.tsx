@@ -9,6 +9,7 @@ describe('GridCard Component', () => {
     size: 'medium',
   };
 
+  // Test: Card displays the provided title and description
   it('renders card with title and description', () => {
     render(
       <GridCard
@@ -22,6 +23,7 @@ describe('GridCard Component', () => {
     expect(screen.getByText('Test Description')).toBeInTheDocument();
   });
 
+  // Test: Active card has highlighted background styling
   it('applies active styling when active prop is true', () => {
     render(
       <GridCard
@@ -36,6 +38,7 @@ describe('GridCard Component', () => {
     expect(button).toHaveClass('bg-[var(--color-primary)]/50');
   });
 
+  // Test: Clicking card triggers onSelect handler with the card's id
   it('calls onSelect handler with correct id when clicked', () => {
     const handleSelect = jest.fn();
     render(
@@ -53,6 +56,7 @@ describe('GridCard Component', () => {
     expect(handleSelect).toHaveBeenCalledWith(42);
   });
 
+  // Test: Card with preset data renders the GridPreset component
   it('renders GridPreset with correct props when preset is provided', () => {
     render(
       <GridCard
@@ -67,6 +71,7 @@ describe('GridCard Component', () => {
     expect(screen.getByText('Card with Preset')).toBeInTheDocument();
   });
 
+  // Test: Long titles are truncated to 2 lines with ellipsis
   it('truncates long title text', () => {
     const longTitle = 'This is a very long title that should be truncated to fit within the card boundaries';
     render(
@@ -81,6 +86,7 @@ describe('GridCard Component', () => {
     expect(titleElement).toHaveClass('line-clamp-2');
   });
 
+  // Test: Long descriptions are truncated to 3 lines with ellipsis
   it('truncates long description text', () => {
     const longDescription = 'This is a very long description that should be truncated to fit within the card boundaries and not overflow';
     render(

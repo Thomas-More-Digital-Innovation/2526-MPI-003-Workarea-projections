@@ -133,8 +133,16 @@ export default function ProjectionPage() {
     setToast({ message, type });
   };
 
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   // --- Load steps and determine if grid or image ---
   useEffect(() => {
+    if (!isMounted) return;
+    
     const loadStepAndContent = async () => {
       const presetId = localStorage.getItem("currentPresetId");
       let stepIndex = Number(localStorage.getItem("currentStepIndex") || "0");
@@ -258,10 +266,11 @@ export default function ProjectionPage() {
     };
 
     loadStepAndContent();
-  }, [router]);
+  }, [router, isMounted]);
 
   // --- Function to advance to next step ---
   const advanceToNextStep = async () => {
+    if (!isMounted) return;
     const presetId = localStorage.getItem("currentPresetId");
     let stepIndex = Number(localStorage.getItem("currentStepIndex") || "0");
     stepIndex++;
@@ -315,7 +324,7 @@ export default function ProjectionPage() {
   // --- Load calibration from localStorage ---
   useEffect(() => {
     // Only load calibration if this is NOT an image step
-    if (isImageStep) return;
+    if (!isMounted || isImageStep) return;
 
     const savedCalibration = localStorage.getItem("webcamCalibration");
     if (savedCalibration) {
@@ -332,7 +341,7 @@ export default function ProjectionPage() {
         router.push("/");
       }
     }
-  }, [router, isImageStep]);
+  }, [router, isImageStep, isMounted]);
 
   // --- Start webcam ---
   const startWebcam = useCallback(async () => {
@@ -1146,7 +1155,7 @@ const generateCirclesForPage = (layout: GridLayout, count: number, maxPerPage: n
 
       {/* Step number */}
       <div className="absolute top-4 right-4 text-6xl font-bold text-blue-500 drop-shadow-[0_0_30px_rgba(0,100,255,0.7)]">
-        Stap {localStorage.getItem("currentStepIndex") ? Number(localStorage.getItem("currentStepIndex")) + 1 : 1}
+        Stap {isMounted && localStorage.getItem("currentStepIndex") ? Number(localStorage.getItem("currentStepIndex")) + 1 : 1}
       </div>
 
       {/* Image tuning controls removed — using hardcoded values per request */}
