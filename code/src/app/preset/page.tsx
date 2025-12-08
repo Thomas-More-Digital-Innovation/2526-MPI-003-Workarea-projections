@@ -52,11 +52,13 @@ export default function PresetToevoegen() {
   // Load preset data if editing
   useEffect(() => {
     const loadPresetData = async () => {
-      // Get preset ID from URL query parameter
-      const params = new URLSearchParams(window.location.search);
-      const presetId = params.get('id');
+      // Get preset ID from localStorage (set by home page)
+      const presetId = localStorage.getItem('editPresetId');
       
       if (!presetId) return;
+      
+      // Clear it after reading so creating new preset works
+      localStorage.removeItem('editPresetId');
 
       setIsLoading(true);
       try {

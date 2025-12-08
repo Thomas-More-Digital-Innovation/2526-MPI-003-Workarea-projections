@@ -6,13 +6,47 @@
   "main": "electron/main.mjs",
   "build": {
     "appId": "com.digital-innovation.work-area-projection",
+    "productName": "Work Area Projection",
     "files": [
-      "out/",
-      "electron/"
+      "out/**/*",
+      "electron/**/*",
+      "public/**/*",
+      "data/**/*",
+      "package.json",
+      "node_modules/better-sqlite3/**/*"
+    ],
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*"
     ],
     "directories": {
-      "buildResources": "assets"
-    }
+      "buildResources": "public",
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "public/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "extraResources": [
+      {
+        "from": "data",
+        "to": "data",
+        "filter": ["**/*"]
+      }
+    ],
+    "fileAssociations": [],
+    "npmRebuild": false
   },
   "scripts": {
     "dev": "next dev",
@@ -20,13 +54,19 @@
     "build": "next build",
     "start": "next start",
     "electron-dev": "cross-env NODE_ENV=development concurrently \"npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
-    "electron-build": "npm run build && electron ."
+    "electron-build": "npm run build && electron .",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder --win",
+    "dist:all": "npm run build && electron-builder -mwl",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
+    "@heroicons/react": "^2.2.0",
     "autoprefixer": "^10.4.21",
     "better-sqlite3": "^12.4.1",
     "lucide-react": "^0.545.0",
-    "@heroicons/react": "^2.2.0",
     "next": "15.5.4",
     "postcss": "^8.5.6",
     "react": "19.1.0",
@@ -34,7 +74,13 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@swc/core": "^1.15.3",
+    "@swc/jest": "^0.2.39",
     "@tailwindcss/postcss": "^4.1.14",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^14.3.1",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/jest": "^29.5.14",
     "@types/node": "^20.19.21",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -44,6 +90,9 @@
     "electron-builder": "^26.0.12",
     "eslint": "^9",
     "eslint-config-next": "15.5.4",
+    "identity-obj-proxy": "^3.0.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
     "tailwindcss": "^4.1.14",
     "typescript": "^5",
     "wait-on": "^9.0.1"

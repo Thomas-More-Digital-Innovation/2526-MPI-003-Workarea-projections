@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import GridPreset from "@/components/grid/GridPreset";
+import Toast from "@/components/ui/Toast";
 
 // --- Types -----------------------------------------------------------------
 interface Point {
@@ -51,7 +52,7 @@ interface Step {
 const GRID_CONFIG = {
   "rectangle-small": { rows: 3, cols: 5, maxPerPage: 15 },
   "rectangle-medium": { rows: 2, cols: 4, maxPerPage: 8 },
-  "rectangle-large": { rows: 2, cols: 3, maxPerPage: 6 },
+  "rectangle-large": { rows: 2, cols: 2, maxPerPage: 4 },
   "circle-small": { rows: 3, cols: 5, maxPerPage: 15 },
   "circle-medium": { rows: 2, cols: 4, maxPerPage: 8 },
   "circle-large": { rows: 1, cols: 4, maxPerPage: 4 },
@@ -111,15 +112,37 @@ export default function ProjectionPage() {
   const [currentImage, setCurrentImage] = useState<ImageData | null>(null);
   const [isImageStep, setIsImageStep] = useState(false);
 
+  // Image processing / detection tuning - hardcoded values
+  const exposure = 1; // multiplier
+  const gamma = 1; // gamma correction (1 = linear)
+  const contrast = 1; // contrast multiplier (1 = no change)
+  const brightnessOffset = 0; // additive offset
+  // detection tuning - hardcoded to requested values
+  const detectionThreshold = 201;
+  const detectionRatio = 0.3;
+
   // Countdown and flow
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isCountingDown, setIsCountingDown] = useState(false);
   const [isDone, setIsDone] = useState(false);
   const [isAllStepsComplete, setIsAllStepsComplete] = useState(false);
   const [waitingForClear, setWaitingForClear] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" | "warning" } | null>(null);
+
+  const showToast = (message: string, type: "success" | "error" | "info" | "warning" = "error") => {
+    setToast({ message, type });
+  };
+
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // --- Load steps and determine if grid or image ---
   useEffect(() => {
+    if (!isMounted) return;
+    
     const loadStepAndContent = async () => {
       const presetId = localStorage.getItem("currentPresetId");
       let stepIndex = Number(localStorage.getItem("currentStepIndex") || "0");
@@ -134,20 +157,20 @@ export default function ProjectionPage() {
       try {
         const api = (globalThis as any)?.electronAPI;
         if (!api?.getStepsByPreset) {
-          alert("Cannot load steps - API method not available");
+          showToast("Cannot load steps - API method not available", "error");
           router.push("/");
           return;
         }
 
         const steps: Step[] = await api.getStepsByPreset(Number(presetId));
         if (!steps || steps.length === 0) {
-          alert("No steps found for this preset");
+          showToast("No steps found for this preset", "error");
           router.push("/");
           return;
         }
 
         if (stepIndex >= steps.length) {
-          alert("All steps completed!");
+          showToast("All steps completed!", "success");
           router.push("/");
           return;
         }
@@ -166,7 +189,7 @@ export default function ProjectionPage() {
           const imageData = allImages.find((img: ImageData) => img.imageId === currentStep.imageId);
           
           if (!imageData) {
-            alert(`Image with ID ${currentStep.imageId} not found`);
+            showToast(`Image with ID ${currentStep.imageId} not found`, "error");
             router.push("/");
             return;
           }
@@ -184,7 +207,7 @@ export default function ProjectionPage() {
           localStorage.setItem("currentGridLayoutId", currentStep.gridLayoutId.toString());
 
           if (!api?.getGridLayouts) {
-            alert("Cannot load grid layout - API method not available");
+            showToast("Cannot load grid layout - API method not available", "error");
             router.push("/");
             return;
           }
@@ -195,7 +218,7 @@ export default function ProjectionPage() {
           );
 
           if (!gridLayoutFromDb) {
-            alert(`Grid layout with ID ${currentStep.gridLayoutId} not found in database`);
+            showToast(`Grid layout with ID ${currentStep.gridLayoutId} not found in database`, "error");
             router.push("/");
             return;
           }
@@ -232,21 +255,22 @@ export default function ProjectionPage() {
 
           console.log(`📊 Loaded grid: ${parsedLayout.amount} circles, ${calculatedTotalPages} pages, ${maxPerPage} per page`);
         } else {
-          alert("Step has no grid layout or image");
+          showToast("Step has no grid layout or image", "error");
           router.push("/");
           return;
         }
       } catch (err) {
-        alert(`Error loading step configuration: ${err}`);
+        showToast(`Error loading step configuration: ${err}`, "error");
         router.push("/");
       }
     };
 
     loadStepAndContent();
-  }, [router]);
+  }, [router, isMounted]);
 
   // --- Function to advance to next step ---
   const advanceToNextStep = async () => {
+    if (!isMounted) return;
     const presetId = localStorage.getItem("currentPresetId");
     let stepIndex = Number(localStorage.getItem("currentStepIndex") || "0");
     stepIndex++;
@@ -300,7 +324,7 @@ export default function ProjectionPage() {
   // --- Load calibration from localStorage ---
   useEffect(() => {
     // Only load calibration if this is NOT an image step
-    if (isImageStep) return;
+    if (!isMounted || isImageStep) return;
 
     const savedCalibration = localStorage.getItem("webcamCalibration");
     if (savedCalibration) {
@@ -317,7 +341,7 @@ export default function ProjectionPage() {
         router.push("/");
       }
     }
-  }, [router, isImageStep]);
+  }, [router, isImageStep, isMounted]);
 
   // --- Start webcam ---
   const startWebcam = useCallback(async () => {
@@ -395,8 +419,7 @@ export default function ProjectionPage() {
     return x;
   }
 
-  // --- Detection function ---
-  const detectObjectsInCircles = useCallback(
+ const detectObjectsInCircles = useCallback(
     (imageData: Uint8ClampedArray, width: number, height: number) => {
       if (!gridLayout) return;
 
@@ -412,39 +435,38 @@ export default function ProjectionPage() {
       // Generate circles for current page only
       const pageCircles = generateCirclesForPage(gridLayout, currentPageCount, maxPerPage);
 
-  const newCircleStates = [...circleStatesRef.current];
-  let hasChanges = false;
-  // Debug: log page info occasionally
-  // console.log(`detect: page=${currentPage+1} start=${startIndex} end=${endIndex} count=${pageCircles.length}`);
+      const newCircleStates = [...circleStatesRef.current];
+      let hasChanges = false;
+
       pageCircles.forEach((circle, localIndex) => {
         const globalIndex = startIndex + localIndex;
 
-  // Skip detection for permanently completed circles
-  if (permanentCompletedRef.current[globalIndex]) return;
+        // Skip detection for permanently completed circles
+        if (permanentCompletedRef.current[globalIndex]) return;
+        // METHOD 1: Brightness/Darkness Detection 
+        let totalPixels = 0;
+        let darkPixels = 0;
+        const step = 2; // Reduced step for better sampling
+        // METHOD 2: Edge Detection (detects object boundaries)
+        let edgePixels = 0;
+        // METHOD 3: Variance Detection (uniform vs varied regions)
+        let sumBrightness = 0;
+        let sumBrightnessSq = 0;
+        // METHOD 4: Color Variance (detect non-white objects)
+        let colorVariance = 0;
+        // METHOD 5: Center-weighted detection (more weight to center)
+        let centerDarkPixels = 0;
+        let centerTotalPixels = 0;
 
-        // ONLY detect changes for circles on the CURRENT page
-        // Don't touch circles from other pages at all
+        // Collect pixel data
+        const pixelData: number[] = [];
 
-  let totalPixels = 0;
-  let darkPixels = 0;
-  // sampling step - smaller value = more samples, more CPU but better
-  // sensitivity on subsequent pages
-  const step = 3;
-
-        // Use different detection logic based on shape
         if (circle.shape === "rectangle" && circle.width && circle.height) {
-          // Rectangle detection: check pixels within the rectangular bounds
+          // Rectangle detection
           const halfWidth = circle.width / 2;
           const halfHeight = circle.height / 2;
-          
-          // Debug: log rectangle bounds for first rectangle
-          if (globalIndex === startIndex) {
-            console.log(`🔍 Rectangle ${globalIndex} detection area:`);
-            console.log(`   Center: (${circle.x.toFixed(1)}, ${circle.y.toFixed(1)})`);
-            console.log(`   Size: ${circle.width.toFixed(1)}×${circle.height.toFixed(1)}px`);
-            console.log(`   Bounds: X[${(circle.x - halfWidth).toFixed(1)} to ${(circle.x + halfWidth).toFixed(1)}]`);
-            console.log(`   Bounds: Y[${(circle.y - halfHeight).toFixed(1)} to ${(circle.y + halfHeight).toFixed(1)}]`);
-          }
+          const quarterWidth = circle.width / 4;
+          const quarterHeight = circle.height / 4;
           
           for (let y = Math.max(0, Math.floor(circle.y - halfHeight)); y <= Math.min(height - 1, Math.floor(circle.y + halfHeight)); y += step) {
             for (let x = Math.max(0, Math.floor(circle.x - halfWidth)); x <= Math.min(width - 1, Math.floor(circle.x + halfWidth)); x += step) {
@@ -454,33 +476,154 @@ export default function ProjectionPage() {
               const g = imageData[idx + 1];
               const b = imageData[idx + 2];
               const brightness = (r + g + b) / 3;
-              if (brightness < 180) darkPixels++;
+              
+              // Method 1: Darkness
+              if (brightness < detectionThreshold) darkPixels++;
+              
+              // Method 2: Edge detection (Sobel-like)
+              if (x > 0 && y > 0 && x < width - 1 && y < height - 1) {
+                const idxLeft = (y * width + (x - 1)) * 4;
+                const idxRight = (y * width + (x + 1)) * 4;
+                const idxTop = ((y - 1) * width + x) * 4;
+                const idxBottom = ((y + 1) * width + x) * 4;
+                
+                const bLeft = (imageData[idxLeft] + imageData[idxLeft + 1] + imageData[idxLeft + 2]) / 3;
+                const bRight = (imageData[idxRight] + imageData[idxRight + 1] + imageData[idxRight + 2]) / 3;
+                const bTop = (imageData[idxTop] + imageData[idxTop + 1] + imageData[idxTop + 2]) / 3;
+                const bBottom = (imageData[idxBottom] + imageData[idxBottom + 1] + imageData[idxBottom + 2]) / 3;
+                
+                const gradX = Math.abs(bRight - bLeft);
+                const gradY = Math.abs(bBottom - bTop);
+                const gradient = Math.sqrt(gradX * gradX + gradY * gradY);
+                
+                if (gradient > 30) edgePixels++;
+              }
+              
+              // Method 3: Variance
+              sumBrightness += brightness;
+              sumBrightnessSq += brightness * brightness;
+              pixelData.push(brightness);
+              
+              // Method 4: Color variance
+              const avgColor = (r + g + b) / 3;
+              colorVariance += Math.abs(r - avgColor) + Math.abs(g - avgColor) + Math.abs(b - avgColor);
+              
+              // Method 5: Center-weighted
+              const distX = Math.abs(x - circle.x);
+              const distY = Math.abs(y - circle.y);
+              if (distX < quarterWidth && distY < quarterHeight) {
+                centerTotalPixels++;
+                if (brightness < detectionThreshold) centerDarkPixels++;
+              }
             }
           }
         } else {
-          // Circle detection: check pixels within the circular bounds
+          // Circle detection
+          const quarterRadius = circle.radius / 2;
+          
           for (let y = Math.max(0, Math.floor(circle.y - circle.radius)); y <= Math.min(height - 1, Math.floor(circle.y + circle.radius)); y += step) {
             for (let x = Math.max(0, Math.floor(circle.x - circle.radius)); x <= Math.min(width - 1, Math.floor(circle.x + circle.radius)); x += step) {
               const dx = x - circle.x;
               const dy = y - circle.y;
-              if (dx * dx + dy * dy <= circle.radius * circle.radius) {
+              const distSq = dx * dx + dy * dy;
+              
+              if (distSq <= circle.radius * circle.radius) {
                 totalPixels++;
                 const idx = (y * width + x) * 4;
                 const r = imageData[idx];
                 const g = imageData[idx + 1];
                 const b = imageData[idx + 2];
                 const brightness = (r + g + b) / 3;
-                // slightly lower threshold to be more sensitive to darker items
-                if (brightness < 180) darkPixels++;
+                
+                // Method 1: Darkness
+                if (brightness < detectionThreshold) darkPixels++;
+                
+                // Method 2: Edge detection
+                if (x > 0 && y > 0 && x < width - 1 && y < height - 1) {
+                  const idxLeft = (y * width + (x - 1)) * 4;
+                  const idxRight = (y * width + (x + 1)) * 4;
+                  const idxTop = ((y - 1) * width + x) * 4;
+                  const idxBottom = ((y + 1) * width + x) * 4;
+                  
+                  const bLeft = (imageData[idxLeft] + imageData[idxLeft + 1] + imageData[idxLeft + 2]) / 3;
+                  const bRight = (imageData[idxRight] + imageData[idxRight + 1] + imageData[idxRight + 2]) / 3;
+                  const bTop = (imageData[idxTop] + imageData[idxTop + 1] + imageData[idxTop + 2]) / 3;
+                  const bBottom = (imageData[idxBottom] + imageData[idxBottom + 1] + imageData[idxBottom + 2]) / 3;
+                  
+                  const gradX = Math.abs(bRight - bLeft);
+                  const gradY = Math.abs(bBottom - bTop);
+                  const gradient = Math.sqrt(gradX * gradX + gradY * gradY);
+                  
+                  if (gradient > 30) edgePixels++;
+                }
+                
+                // Method 3: Variance
+                sumBrightness += brightness;
+                sumBrightnessSq += brightness * brightness;
+                pixelData.push(brightness);
+                
+                // Method 4: Color variance
+                const avgColor = (r + g + b) / 3;
+                colorVariance += Math.abs(r - avgColor) + Math.abs(g - avgColor) + Math.abs(b - avgColor);
+                
+                // Method 5: Center-weighted
+                if (distSq <= quarterRadius * quarterRadius) {
+                  centerTotalPixels++;
+                  if (brightness < detectionThreshold) centerDarkPixels++;
+                }
               }
             }
           }
         }
-
-        const isDetected = totalPixels > 0 && darkPixels / totalPixels > 0.3;
-        if (isDetected) {
-          console.log(`🔍 detect: page ${currentPage + 1} circle ${globalIndex} samples=${totalPixels} dark=${darkPixels} ratio=${(darkPixels/totalPixels).toFixed(2)}`);
+        // Calculate detection metrics
+        
+        // Method 1: Basic darkness ratio
+        const darknessRatio = totalPixels > 0 ? darkPixels / totalPixels : 0;
+        const method1Detected = darknessRatio > detectionRatio;
+        
+        // Method 2: Edge detection ratio
+        const edgeRatio = totalPixels > 0 ? edgePixels / totalPixels : 0;
+        const method2Detected = edgeRatio > 0.15; // 15% of pixels showing edges
+        
+        // Method 3: Brightness variance (high variance = object present)
+        const mean = totalPixels > 0 ? sumBrightness / totalPixels : 0;
+        const variance = totalPixels > 0 ? (sumBrightnessSq / totalPixels - mean * mean) : 0;
+        const method3Detected = variance > 1000; // Significant brightness variation
+        
+        // Method 4: Color variance (colored objects vs white background)
+        const avgColorVariance = totalPixels > 0 ? colorVariance / totalPixels : 0;
+        const method4Detected = avgColorVariance > 20; // Colors differ from grayscale
+        
+        // Method 5: Center-weighted detection (object in center)
+        const centerDarknessRatio = centerTotalPixels > 0 ? centerDarkPixels / centerTotalPixels : 0;
+        const method5Detected = centerDarknessRatio > (detectionRatio + 0.1); // Stricter for center
+        
+        // Combined detection decision (voting system)
+        const detectionVotes = [
+          method1Detected ? 2 : 0,  // Darkness gets 2 votes (most reliable)
+          method2Detected ? 1 : 0,  // Edge detection gets 1 vote
+          method3Detected ? 1 : 0,  // Variance gets 1 vote
+          method4Detected ? 1 : 0,  // Color variance gets 1 vote
+          method5Detected ? 2 : 0,  // Center-weighted gets 2 votes (very reliable)
+        ];
+        
+        const totalVotes = detectionVotes.reduce((a, b) => a + b, 0);
+        const isDetected = totalVotes >= 3; // Need at least 3 votes to detect
+        
+        // Enhanced logging for debugging
+        if (isDetected || newCircleStates[globalIndex]) {
+          console.log(`🔍 Circle ${globalIndex} detection:`, {
+            page: currentPage + 1,
+            darkness: `${(darknessRatio * 100).toFixed(1)}% (${method1Detected ? '✓' : '✗'})`,
+            edges: `${(edgeRatio * 100).toFixed(1)}% (${method2Detected ? '✓' : '✗'})`,
+            variance: `${variance.toFixed(0)} (${method3Detected ? '✓' : '✗'})`,
+            colorVar: `${avgColorVariance.toFixed(1)} (${method4Detected ? '✓' : '✗'})`,
+            centerDark: `${(centerDarknessRatio * 100).toFixed(1)}% (${method5Detected ? '✓' : '✗'})`,
+            votes: totalVotes,
+            detected: isDetected
+          });
         }
+
         if (newCircleStates[globalIndex] !== isDetected) {
           newCircleStates[globalIndex] = isDetected;
           hasChanges = true;
@@ -655,9 +798,36 @@ const generateCirclesForPage = (layout: GridLayout, count: number, maxPerPage: n
         if (ix >= 0 && iy >= 0 && ix < video.videoWidth && iy < video.videoHeight) {
           const srcIdx = (iy * video.videoWidth + ix) * 4;
           const dstIdx = (y * targetWidth + x) * 4;
-          dstData[dstIdx] = srcData[srcIdx];
-          dstData[dstIdx + 1] = srcData[srcIdx + 1];
-          dstData[dstIdx + 2] = srcData[srcIdx + 2];
+          // Read source pixel
+          let r = srcData[srcIdx];
+          let g = srcData[srcIdx + 1];
+          let b = srcData[srcIdx + 2];
+
+          // Apply exposure (scale)
+          r = r * exposure;
+          g = g * exposure;
+          b = b * exposure;
+
+          // Apply additive brightness offset
+          r = r + brightnessOffset;
+          g = g + brightnessOffset;
+          b = b + brightnessOffset;
+
+          // Apply contrast about mid-point 128
+          r = (r - 128) * contrast + 128;
+          g = (g - 128) * contrast + 128;
+          b = (b - 128) * contrast + 128;
+
+          // Apply gamma correction (avoid division by zero)
+          const gInv = gamma > 0 ? 1 / gamma : 1;
+          r = 255 * Math.pow(Math.max(0, Math.min(255, r)) / 255, gInv);
+          g = 255 * Math.pow(Math.max(0, Math.min(255, g)) / 255, gInv);
+          b = 255 * Math.pow(Math.max(0, Math.min(255, b)) / 255, gInv);
+
+          // Clamp and write back
+          dstData[dstIdx] = Math.max(0, Math.min(255, Math.round(r)));
+          dstData[dstIdx + 1] = Math.max(0, Math.min(255, Math.round(g)));
+          dstData[dstIdx + 2] = Math.max(0, Math.min(255, Math.round(b)));
           dstData[dstIdx + 3] = 255;
         }
       }
@@ -665,33 +835,10 @@ const generateCirclesForPage = (layout: GridLayout, count: number, maxPerPage: n
 
     ctx.putImageData(dstImage, 0, 0);
     
-    // DEBUG: Draw detection areas on canvas to visualize where we're checking
-    if (gridLayout) {
-      const key = `${gridLayout.shape}-${gridLayout.size}` as keyof typeof GRID_CONFIG;
-      const config = GRID_CONFIG[key];
-      const maxPerPage = config.maxPerPage;
-      const startIndex = currentPage * maxPerPage;
-      const endIndex = Math.min(startIndex + maxPerPage, gridLayout.amount);
-      const currentPageCount = endIndex - startIndex;
-      const pageCircles = generateCirclesForPage(gridLayout, currentPageCount, maxPerPage);
-      
-      ctx.strokeStyle = 'red';
-      ctx.lineWidth = 2;
-      pageCircles.forEach(circle => {
-        if (circle.shape === "rectangle" && circle.width && circle.height) {
-          ctx.strokeRect(
-            circle.x - circle.width / 2,
-            circle.y - circle.height / 2,
-            circle.width,
-            circle.height
-          );
-        } else {
-          ctx.beginPath();
-          ctx.arc(circle.x, circle.y, circle.radius, 0, 2 * Math.PI);
-          ctx.stroke();
-        }
-      });
-    }
+    // NOTE: Previously we drew red debug outlines on the canvas to visualize
+    // detection areas. Those overlays are not required in the projection view
+    // — keep the canvas image only and let the GridPreset DOM elements render
+    // the visible shapes (black / completed-green). Skipping debug drawing here.
     
     detectObjectsInCircles(dstData, targetWidth, targetHeight);
   }, [calibrationData, detectObjectsInCircles, gridLayout, currentPage]);
@@ -921,16 +1068,12 @@ const generateCirclesForPage = (layout: GridLayout, count: number, maxPerPage: n
 
   // --- JSX -----------------------------------------------------------------
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center relative">
+    <div className="min-h-screen bg-white flex items-center justify-center relative overflow-hidden">
       {/* Hidden video (camera source) */}
       <video ref={videoRef} autoPlay muted playsInline className="hidden" />
 
-      {/* Debug canvas - shows transformed video with detection areas */}
-      <canvas 
-        ref={canvasRef} 
-        className="absolute top-0 left-0 w-full h-full object-contain opacity-50 pointer-events-none" 
-        style={{ zIndex: 1000, mixBlendMode: 'multiply' }}
-      />
+      {/* Canvas is hidden — we don't show the camera image in projection, only the DOM shapes */}
+      <canvas ref={canvasRef} className="hidden" aria-hidden="true" />
 
       {/* CONTENT: Image or Grid */}
       {isImageStep && currentImage ? (
@@ -978,7 +1121,7 @@ const generateCirclesForPage = (layout: GridLayout, count: number, maxPerPage: n
 
       {/* Page advance countdown (for auto-advancing between pages) */}
       {!isImageStep && waitingForClear && !isDone && (
-        <div className="absolute inset-0 flex flex-col items-center justify-end pointer-events-none pb-32 gap-4">
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none gap-4">
           <div className="text-6xl font-bold text-yellow-500 drop-shadow-[0_0_20px_rgba(255,255,0,0.7)]">
             Verwijder alle items
           </div>
@@ -987,14 +1130,14 @@ const generateCirclesForPage = (layout: GridLayout, count: number, maxPerPage: n
 
       {/* Countdown display (5 seconds when page/all completed) */}
       {!isImageStep && countdown !== null && countdown > 0 && (
-        <div className="absolute inset-0 flex items-end justify-center pointer-events-none pb-32">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-9xl font-bold text-green-500 drop-shadow-[0_0_30px_rgba(0,255,0,0.7)]">{countdown}</div>
         </div>
       )}
 
       {/* Done display - waiting for items to be removed */}
       {!isImageStep && isDone && !isAllStepsComplete && (
-        <div className="absolute inset-0 flex flex-col items-center justify-end pointer-events-none pb-32 gap-4">
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none gap-4">
           <div className="text-6xl font-bold text-blue-500 drop-shadow-[0_0_20px_rgba(0,100,255,0.7)]">
             Verwijder alle items
           </div>
@@ -1003,7 +1146,7 @@ const generateCirclesForPage = (layout: GridLayout, count: number, maxPerPage: n
 
       {/* All steps complete display */}
       {isAllStepsComplete && (
-        <div className="absolute inset-0 flex items-end justify-center pointer-events-none pb-32">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-8xl font-bold text-green-500 drop-shadow-[0_0_30px_rgba(0,255,0,0.7)]">
             alle stappen zijn klaar
           </div>
@@ -1012,9 +1155,19 @@ const generateCirclesForPage = (layout: GridLayout, count: number, maxPerPage: n
 
       {/* Step number */}
       <div className="absolute top-4 right-4 text-6xl font-bold text-blue-500 drop-shadow-[0_0_30px_rgba(0,100,255,0.7)]">
-        Stap {localStorage.getItem("currentStepIndex") ? Number(localStorage.getItem("currentStepIndex")) + 1 : 1}
+        Stap {isMounted && localStorage.getItem("currentStepIndex") ? Number(localStorage.getItem("currentStepIndex")) + 1 : 1}
       </div>
 
+      {/* Image tuning controls removed — using hardcoded values per request */}
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }
