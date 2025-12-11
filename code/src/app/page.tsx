@@ -233,7 +233,7 @@ export default function Home() {
       <div className="p-4">
         <Footer>
           <Button
-            type="secondary"
+            type="primary"
             text={"Bewerken"}
             onClick={() => {
               if (selectedCard === null) {
@@ -248,7 +248,7 @@ export default function Home() {
             fixedWidth={true}
           />
            <Button
-            type="primary"
+            type="secondary"
             text={"Kalibratie"}
             onClick={handleCalibration}
             fullWidth={false}

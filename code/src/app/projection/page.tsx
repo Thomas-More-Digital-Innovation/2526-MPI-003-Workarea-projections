@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import GridPreset from "@/components/grid/GridPreset";
 import Toast from "@/components/ui/Toast";
+import Popup from "@/components/ui/Popup";
 
 // --- Types -----------------------------------------------------------------
 interface Point {
@@ -73,6 +74,7 @@ export default function ProjectionPage() {
   // Calibration / webcam states
   const [calibrationData, setCalibrationData] = useState<CalibrationData | null>(null);
   const [isWebcamActive, setIsWebcamActive] = useState(false);
+  const [showCalibrationPopup, setShowCalibrationPopup] = useState(false);
 
   // Grid / detection state
   const [circles, setCircles] = useState<Circle[]>([]);
@@ -335,11 +337,7 @@ export default function ProjectionPage() {
         setCalibrationData(null);
       }
     } else {
-      if (confirm("No calibration found. Click OK to go to calibration page, or Cancel to return to homepage.")) {
-        router.push("/calibration");
-      } else {
-        router.push("/");
-      }
+      setShowCalibrationPopup(true);
     }
   }, [router, isImageStep, isMounted]);
 
@@ -1161,6 +1159,22 @@ const generateCirclesForPage = (layout: GridLayout, count: number, maxPerPage: n
       {/* Image tuning controls removed — using hardcoded values per request */}
 
       {/* Toast Notification */}
+      {showCalibrationPopup && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+          <Popup
+            popupType="noCalibration"
+            onClose={() => {
+              setShowCalibrationPopup(false);
+              router.push("/");
+            }}
+            onConfirm={() => {
+              setShowCalibrationPopup(false);
+              router.push("/calibration");
+            }}
+          />
+        </div>
+      )}
+
       {toast && (
         <Toast
           message={toast.message}
