@@ -23,6 +23,7 @@ type PopupProps = {
   popupType: string;
   onClose?: () => void;
   onSave?: (amount: number, shape: "circle" | "rectangle", size: "small" | "medium" | "large") => void;
+  onConfirm?: () => void;
   initialValues?: {
     amount: number;
     shape: "circle" | "rectangle";
@@ -30,6 +31,7 @@ type PopupProps = {
   };
   images?: { imageId: number; path: string }[];
   onImageSelect?: (imageId: number) => void;
+  presetName?: string;
 };
 
 const POPUP_TITLES: Record<string, string> = {
@@ -37,9 +39,11 @@ const POPUP_TITLES: Record<string, string> = {
   exportImport: "Importeer / Exporteer Presets",
   removeImage: "Foto Verwijderen",
   gridPreset: "Grid Toevoegen",
+  deletePreset: "Preset Verwijderen",
+  noCalibration: "Kalibratie Niet Gevonden",
 };
 
-const Popup = ({ popupType, onClose, onSave, initialValues, images, onImageSelect }: PopupProps) => {
+const Popup = ({ popupType, onClose, onSave, onConfirm, initialValues, images, onImageSelect, presetName }: PopupProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [hoveredBox, setHoveredBox] = React.useState<'export' | 'import' | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -415,7 +419,7 @@ const Popup = ({ popupType, onClose, onSave, initialValues, images, onImageSelec
                 <InputField
                   type="textField"
                   label="Aantal"
-                  hint={`Aantal vormen (max ${getMaxAmount()})`}
+                  hint={`Max ${getMaxAmount()}`}
                   value={amount}
                   onChange={(value) => {
                     const numValue = parseInt(value, 10);
@@ -533,6 +537,40 @@ const Popup = ({ popupType, onClose, onSave, initialValues, images, onImageSelec
             </div>
         )}
 
+        {popupType === "deletePreset" && (
+          <div className="flex flex-col items-center py-6">
+            <div className="bg-red-50 rounded-full p-6 mb-6">
+              <svg className="w-20 h-20 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h3 className="text-3xl font-semibold mb-4 text-center">Weet je het zeker?</h3>
+            <p className="text-xl text-gray-600 text-center mb-2">
+              Je staat op het punt om de preset <span className="text-xl font-bold text-[var(--color-primary)] text-center mb-2">"{presetName || 'deze preset'}"</span> te verwijderen.
+            </p>
+            <p className="text-xl text-gray-600 text-center">
+              Deze actie kan niet ongedaan worden gemaakt.
+            </p>
+          </div>
+        )}
+
+        {popupType === "noCalibration" && (
+          <div className="flex flex-col items-center py-6">
+            <div className="bg-yellow-50 rounded-full p-6 mb-6">
+              <svg className="w-20 h-20 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12A9 9 0 1112 3a9 9 0 019 9z" />
+              </svg>
+            </div>
+            <h3 className="text-3xl font-semibold mb-4 text-center">Kalibratie niet gevonden</h3>
+            <p className="text-xl text-gray-600 text-center mb-2">
+              Er is geen webcamkalibratie gevonden voor deze sessie.
+            </p>
+            <p className="text-xl text-gray-600 text-center">
+              Klik op "Kalibreren" om te kalibreren, of op "Terug" om naar de startpagina te gaan.
+            </p>
+          </div>
+        )}
+
         <div className="w-full mt-4">
           {popupType === "removeImage" && (
             <div className="flex justify-between items-center">
@@ -541,6 +579,17 @@ const Popup = ({ popupType, onClose, onSave, initialValues, images, onImageSelec
               </div>
               <div className="w-[282px]">
                 <Button type="primary" text="Verwijderen" />
+              </div>
+            </div>
+          )}
+
+          {popupType === "deletePreset" && (
+            <div className="flex justify-between items-center space-x-6">
+              <div className="w-[282px]">
+                <Button type="secondary" text="Annuleren" onClick={onClose} />
+              </div>
+              <div className="w-[282px]">
+                <Button type="primary" text="Verwijderen" onClick={onConfirm} />
               </div>
             </div>
           )}
@@ -585,6 +634,17 @@ const Popup = ({ popupType, onClose, onSave, initialValues, images, onImageSelec
               </div>
               <div className="w-[282px]">
                 <Button type="primary" text="Opslaan" onClick={handleSave} />
+              </div>
+            </div>
+          )}
+
+          {popupType === "noCalibration" && (
+            <div className="flex justify-between items-center space-x-6">
+              <div className="w-[282px]">
+                <Button type="secondary" text="Terug" onClick={onClose} />
+              </div>
+              <div className="w-[282px]">
+                <Button type="primary" text="Kalibreren" onClick={onConfirm} />
               </div>
             </div>
           )}

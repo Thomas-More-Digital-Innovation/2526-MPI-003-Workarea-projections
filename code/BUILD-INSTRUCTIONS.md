@@ -36,6 +36,7 @@ After successful build, you'll find:
 
 ## Available Build Commands
 
+
 - `npm run dist` - Creates Windows installer (.exe)
 - `npm run pack` - Creates unpacked application folder (for testing)
 - `npm run dist:all` - Creates installers for Mac, Windows, and Linux

@@ -42,6 +42,7 @@ export default function PresetToevoegen() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" | "warning" } | null>(null);
   const [openMenuIndex, setOpenMenuIndex] = useState<number | null>(null);
   const [showPopupImage, setShowPopupImage] = useState(false);
+  const [showDeletePopup, setShowDeletePopup] = useState(false);
   const [availableImages, setAvailableImages] = useState<Array<{ imageId: number; path: string; description: string }>>([]);
   const router = useRouter();
 
@@ -294,12 +295,15 @@ export default function PresetToevoegen() {
     setDraggedIndex(null);
   };
 
-  const handleDeletePreset = async () => {
+  const handleDeletePreset = () => {
+    if (!editingPresetId) return;
+    setShowDeletePopup(true);
+  };
+
+  const confirmDeletePreset = async () => {
     if (!editingPresetId) return;
 
-    // Confirm deletion
-    const confirmed = confirm("Weet je zeker dat je deze preset wilt verwijderen?");
-    if (!confirmed) return;
+    setShowDeletePopup(false);
 
     try {
       const api = (globalThis as any)?.electronAPI;
@@ -663,6 +667,18 @@ export default function PresetToevoegen() {
               shape: editingGrid.shape,
               size: editingGrid.size,
             }}
+          />
+        </div>
+      )}
+
+      {/* Delete Preset Popup */}
+      {showDeletePopup && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+          <Popup
+            popupType="deletePreset"
+            onClose={() => setShowDeletePopup(false)}
+            onConfirm={confirmDeletePreset}
+            presetName={presetName}
           />
         </div>
       )}

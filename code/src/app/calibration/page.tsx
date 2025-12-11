@@ -306,7 +306,7 @@ export default function CalibrationPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-between bg-[var(--color-secondary)]/20 p-2">
+    <div className="min-h-screen flex flex-col justify-between bg-[var(--color-secondary)]/20">
       <div className="w-[1280px] mx-auto">
         <div className="w-[1280px] flex ">
           {/* Webcam Section */}
@@ -398,7 +398,7 @@ export default function CalibrationPage() {
           <Button 
             onClick={() => router.push('/')} 
             text="Terug" 
-            type="secondary"
+            type="primary"
             fullWidth={false}
             fixedWidth={true}
           />
