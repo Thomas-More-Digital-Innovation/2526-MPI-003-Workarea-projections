@@ -84,4 +84,4 @@ npm run dist
 - The first build may take several minutes
 - Build output size is approximately 200-300 MB
 - The installer is not code-signed (users may see Windows SmartScreen warning)
-- Icon can be customized by replacing `public/icon.ico`
+- Icon can be customized by replacing `electron/assets/icon.ico`

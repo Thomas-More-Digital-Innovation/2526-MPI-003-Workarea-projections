@@ -43,3 +43,5 @@ next-env.d.ts
 #images
 /public/images
 /data/app.db
+
+release

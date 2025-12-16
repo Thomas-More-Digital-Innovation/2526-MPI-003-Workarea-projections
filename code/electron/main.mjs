@@ -393,7 +393,6 @@ function createWindow() {
     resizable: true,
     maximizable: true,
     minimizable: true,
-    icon: path.join(__dirname, '../public/MPIIcon.png'),
     autoHideMenuBar: true,
     frame: true,
     webPreferences: {
@@ -402,6 +401,7 @@ function createWindow() {
       sandbox: false,
       preload: path.join(__dirname, 'preload.cjs'),
     },
+    icon: path.join(__dirname, 'assets/icon.png'),
   });
 
   mainWindow.maximize();
